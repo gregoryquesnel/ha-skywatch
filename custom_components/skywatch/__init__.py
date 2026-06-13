@@ -77,6 +77,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Register skywatch.* services on first entry; remove on last unload.
+    if len(hass.config_entries.async_entries(DOMAIN)) == 1:
+        from .services import async_register_services  # noqa: PLC0415
+
+        await async_register_services(hass)
+
     entry.async_on_unload(entry.add_update_listener(_async_reload_on_options_change))
     return True
 
@@ -90,4 +96,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         coordinator = hass.data[DOMAIN].pop(entry.entry_id)
         await coordinator.async_unload()
+        if not hass.config_entries.async_entries(DOMAIN):
+            from .services import async_unregister_services  # noqa: PLC0415
+
+            async_unregister_services(hass)
     return unload_ok
