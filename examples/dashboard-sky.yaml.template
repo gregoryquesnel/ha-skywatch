@@ -1,0 +1,335 @@
+# Skywatch — example dashboard
+#
+# Copy this into a new HA dashboard YAML (Settings → Dashboards → +
+# Add Dashboard → "From YAML"). Adjust entity IDs only if your install
+# uses non-default skywatch_ prefixes.
+#
+# Prerequisites:
+#   1. AlexandrErohin/home-assistant-flightradar24 installed + configured
+#   2. plckr/flightradar-flight-card installed via HACS
+#   3. skywatch integration set up via the UI (config flow)
+#
+# Optional user-created HA core helpers (these drive the pagination /
+# search box; not built into the integration):
+#   input_number.skywatch_log_page (range 1-20, step 1)
+#   input_text.skywatch_log_search_term (max 50 chars)
+# Plus 2 automations that call skywatch.set_page / set_search_term when
+# the input helpers change (sample automations in
+# examples/input-helper-automations.yaml).
+#
+# Watch sensors (sensor.skywatch_watch_<slug>) materialize automatically
+# for each watch entry you add via the skywatch options flow.
+
+views:
+  - title: Sky
+    path: sky
+    icon: mdi:airplane
+    type: sections
+    max_columns: 4
+    sections:
+      - type: grid
+        background:
+          color: cyan
+          opacity: 20
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Live Map
+            heading_style: title
+          - type: iframe
+            url: /api/skywatch/map
+            grid_options:
+              columns: full
+              rows: 6
+
+      - type: grid
+        background:
+          color: blue
+          opacity: 20
+        cards:
+          - type: heading
+            heading: Live Sky
+            heading_style: title
+          - type: tile
+            entity: binary_sensor.skywatch_has_aircraft
+            name: Aircraft present
+            grid_options:
+              columns: 12
+              rows: 1
+          - type: tile
+            entity: sensor.skywatch_flights_in_area
+            name: Aircraft in area
+            icon: mdi:radar
+            grid_options:
+              columns: 12
+              rows: 1
+          - type: custom:flightradar-flight-card
+            entities:
+              - entity_id: sensor.flightradar24_current_in_area
+                title: In Area Now
+              - entity_id: sensor.flightradar24_entered_area
+                title: Just Entered
+              - entity_id: sensor.flightradar24_exited_area
+                title: Just Exited
+              - entity_id: sensor.flightradar24_additional_tracked
+                title: Tracked
+            units:
+              altitude: ft
+              distance: km
+              ground_speed: kmh
+            show_flightradar_link: true
+            show_airline_info_column: true
+            show_airline_logo: true
+            show_aircraft_photo: true
+            show_progress_bar: true
+            carousel:
+              enable: true
+              show_controls: true
+              loop: true
+            grid_options:
+              columns: full
+          - type: tile
+            entity: binary_sensor.skywatch_helicopter_overhead
+            name: Helicopter Overhead
+            icon: mdi:helicopter
+            color: orange
+            state_content:
+              - state
+              - last-changed
+            visibility:
+              - condition: state
+                entity: binary_sensor.skywatch_helicopter_overhead
+                state: 'on'
+            grid_options:
+              columns: full
+              rows: 1
+
+      - type: grid
+        background:
+          color: lime
+          opacity: 20
+        cards:
+          - type: heading
+            heading: Sky Pulse
+            heading_style: title
+          - type: tile
+            entity: sensor.skywatch_log_today
+            name: Sightings today
+            icon: mdi:calendar-today
+            color: lime
+            grid_options:
+              columns: 6
+              rows: 1
+          - type: tile
+            entity: sensor.skywatch_log_this_week
+            name: This week
+            icon: mdi:calendar-week
+            color: lime
+            grid_options:
+              columns: 6
+              rows: 1
+          - type: history-graph
+            title: Aircraft in area — 7 day trend
+            entities:
+              - sensor.skywatch_flights_in_area
+            hours_to_show: 168
+            grid_options:
+              columns: full
+              rows: 4
+
+      - type: grid
+        background:
+          color: indigo
+          opacity: 20
+        cards:
+          - type: heading
+            heading: Airport Movements
+            heading_style: title
+          - type: markdown
+            content: |
+              {%- set m = state_attr('sensor.skywatch_movements_today','movements') or [] -%}
+              **{{ m | length }} movements today**
+              ({{ state_attr('sensor.skywatch_movements_today','landed') }} landed,
+              {{ state_attr('sensor.skywatch_movements_today','took_off') }} took off)
+
+              | Time | Dir | Flight | Aircraft | Route |
+              |------|-----|--------|----------|-------|
+              {%- for r in m %}
+              | {{ r.event_time_local or '—' }} | {% if r.direction == 'landed' %}🛬{% else %}🛫{% endif %} | {{ r.callsign or r.flight_number or '?' }} | {{ r.aircraft_model or r.aircraft_code or '?' }} | {{ r.origin_iata or '—' }}→{{ r.destination_iata or '—' }} |
+              {%- endfor %}
+            grid_options:
+              columns: full
+              rows: auto
+
+      - type: grid
+        background:
+          color: amber
+          opacity: 15
+        column_span: 4
+        cards:
+          - type: heading
+            heading: Watch List
+            heading_style: title
+          - type: markdown
+            content: |
+              {%- set domain = 'sensor' -%}
+              {%- set entities = states[domain] | rejectattr('object_id', 'eq', None) | selectattr('object_id', 'search', '^skywatch_watch_') | list -%}
+              {% if entities | length == 0 %}
+              _Add watch entries via the Skywatch integration's options flow._
+              {% else %}
+              {% for e in entities %}
+              **{{ e.name }}** — {{ e.state }} lifetime sightings.
+              {% if e.attributes.last_seen_local %}Last seen: {{ e.attributes.last_seen_local }} ({{ e.attributes.last_seen_relative }}){% if e.attributes.last_aircraft_model %} · {{ e.attributes.last_aircraft_model }}{% endif %}{% endif %}
+              {% endfor %}
+              {% endif %}
+            grid_options:
+              columns: full
+
+      - type: grid
+        background:
+          color: red
+          opacity: 15
+        column_span: 4
+        cards:
+          - type: heading
+            heading: Military Sightings
+            heading_style: title
+          - type: markdown
+            content: |
+              {%- set rows = state_attr('sensor.skywatch_military_sightings', 'sightings') or [] -%}
+              {%- set total = states('sensor.skywatch_military_sightings') | int(0) -%}
+              **{{ total }} military sightings on record**
+
+              | Date | Callsign | Type | Model | Route |
+              |------|----------|------|-------|-------|
+              {%- for r in rows %}
+              | {{ r.exit_time_local or '—' }} | {{ r.callsign or '—' }} | {{ r.aircraft_code or '?' }} | {{ r.aircraft_model or '?' }} | {{ r.origin_iata or '—' }}→{{ r.destination_iata or '—' }} |
+              {%- endfor %}
+              {% if not rows %}_No military sightings yet._{% endif %}
+            grid_options:
+              columns: full
+              rows: auto
+
+      - type: grid
+        background:
+          color: teal
+          opacity: 20
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Sightings Log
+            heading_style: title
+          - type: tile
+            entity: sensor.skywatch_log_stats
+            name: All-time
+            icon: mdi:database
+            color: teal
+            grid_options:
+              columns: 6
+              rows: 1
+          - type: tile
+            entity: sensor.skywatch_log_today
+            name: Today
+            icon: mdi:calendar-today
+            color: blue
+            grid_options:
+              columns: 6
+              rows: 1
+          - type: entities
+            entities:
+              - entity: input_text.skywatch_log_search_term
+                name: Search sightings
+                icon: mdi:magnify
+            grid_options:
+              columns: full
+          - type: tile
+            entity: input_number.skywatch_log_page
+            name: Page
+            icon: mdi:format-list-numbered
+            color: teal
+            features:
+              - type: numeric-input
+            features_position: bottom
+            visibility:
+              - condition: state
+                entity: input_text.skywatch_log_search_term
+                state: ''
+            grid_options:
+              columns: full
+              rows: 2
+          - type: markdown
+            content: |
+              {% set term = states('input_text.skywatch_log_search_term') | trim %}
+              {% if term %}
+                {% set rows = state_attr('sensor.skywatch_log_search', 'sightings') or [] %}
+              {% else %}
+                {% set rows = state_attr('sensor.skywatch_log_recent', 'sightings') or [] %}
+              {% endif %}
+              {% set page = state_attr('sensor.skywatch_log_recent', 'page') or 1 %}
+              {% set total_pages = state_attr('sensor.skywatch_log_recent', 'total_pages') or 1 %}
+              {% set total_count = state_attr('sensor.skywatch_log_recent', 'total_count') or 0 %}
+              {% if term %}**Search:** `{{ term }}` — {{ rows | length }} match(es){% else %}**Page {{ page }} of {{ total_pages }}** — {{ total_count }} total{% endif %}
+
+              | When | Flight | Aircraft | Route | Alt | Dist | Dwell |
+              |------|--------|----------|-------|-----|------|-------|
+              {%- for f in rows %}
+              | {{ f.exit_time_local or '—' }} | {{ f.callsign or '?' }} | {{ f.aircraft_code or '?' }} | {{ f.origin_iata or '—' }}→{{ f.destination_iata or '—' }} | {{ f.altitude_ft or '—' }} ft | {{ f.closest_km or '—' }} km | {% if f.dwell_seconds %}{{ (f.dwell_seconds / 60) | round(0) | int }}m{% else %}—{% endif %} |
+              {%- endfor %}
+            grid_options:
+              columns: full
+
+      - type: grid
+        background:
+          color: teal
+          opacity: 20
+        cards:
+          - type: heading
+            heading: Top Sightings
+            heading_style: title
+          - type: markdown
+            content: |
+              **Top airlines** (lifetime)
+              {% for a in (state_attr('sensor.skywatch_log_stats','top_airlines') or [])[:5] -%}
+              - {{ a.airline }}: {{ a.n }}
+              {% endfor %}
+
+              **Top aircraft** (lifetime)
+              {% for a in (state_attr('sensor.skywatch_log_stats','top_aircraft') or [])[:5] -%}
+              - {{ a.aircraft_model }}: {{ a.n }}
+              {% endfor %}
+
+              **Top routes** (lifetime)
+              {% set rows = state_attr('sensor.skywatch_log_top_routes', 'routes') or [] %}
+              {% for r in rows[:5] -%}
+              - {{ r.origin_iata }}→{{ r.destination_iata }}: {{ r.n }}
+              {% endfor %}
+            grid_options:
+              columns: full
+
+      - type: grid
+        background:
+          color: teal
+          opacity: 20
+        column_span: 4
+        cards:
+          - type: heading
+            heading: Flew Over
+            heading_style: title
+          - type: markdown
+            content: |
+              {%- set rows = state_attr('sensor.skywatch_log_overhead', 'recent_overhead') or [] -%}
+              {%- set total = states('sensor.skywatch_log_overhead') | int(0) -%}
+              **{{ total }} lifetime overhead transits** (< 5 km AND < 10,000 ft)
+
+              {% if rows | length == 0 -%}
+              _Nothing has actually passed overhead yet._
+              {%- else -%}
+              | Time | Callsign | Aircraft | Route | Alt | Closest |
+              |---|---|---|---|---:|---:|
+              {% for r in rows -%}
+              | {{ r.exit_time[11:16] if r.exit_time else '?' }} | `{{ r.callsign or '?' }}` | {{ r.aircraft_model or '?' }} | {{ r.origin_iata or '?' }}→{{ r.destination_iata or '?' }} | {{ r.altitude_ft }} ft | {{ '%.1f' | format(r.closest_km) }} km |
+              {% endfor %}
+              {%- endif %}
+            grid_options:
+              columns: full
+              rows: auto

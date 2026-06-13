@@ -14,3 +14,34 @@ import_legacy_db:
       example: /config/sky_sightings.db
       selector:
         text:
+
+set_page:
+  name: Set sightings page
+  description: >-
+    Update the coordinator's recent-sightings pagination cursor. The next
+    refresh of sensor.skywatch_log_recent reflects the new page.
+  fields:
+    page:
+      name: Page number
+      description: 1-indexed; clamped to [1, total_pages].
+      required: true
+      example: 2
+      selector:
+        number:
+          min: 1
+          max: 1000
+          mode: box
+
+set_search_term:
+  name: Set sightings search term
+  description: >-
+    Update the coordinator's search-term cursor. The next refresh of
+    sensor.skywatch_log_search reflects the new term. Empty string clears.
+  fields:
+    term:
+      name: Search term
+      description: Substring matched against callsign / flight_number / airline / registration / IATA / aircraft_code / aircraft_model.
+      required: true
+      example: ACA123
+      selector:
+        text:
