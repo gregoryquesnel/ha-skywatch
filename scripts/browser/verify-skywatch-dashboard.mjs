@@ -59,8 +59,11 @@ const EXPECTED_TEXTS = [
   'Active last 24h',
   // v0.2 Tier 3 — in-area carousel (flightradar-flight-card HACS)
   'In-area carousel',
-  // v0.2 follow-up — pagination controls via skywatch.set_page service
+  // v0.2 follow-up — native control entities (number/text/switch/button)
   'Sightings controls',
+  'Page',
+  'Alerts',
+  'Search sightings',
 ];
 
 const FORBIDDEN_TEXTS = [
