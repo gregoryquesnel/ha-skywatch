@@ -57,6 +57,8 @@ const EXPECTED_TEXTS = [
   'Sky Pulse',
   'Active last 1h',
   'Active last 24h',
+  // v0.2 Tier 3 — in-area carousel (flightradar-flight-card HACS)
+  'In-area carousel',
 ];
 
 const FORBIDDEN_TEXTS = [
@@ -109,7 +111,11 @@ async function run() {
 
     console.log(`\n==> Viewport ${vp.name} (${vp.width}x${vp.height})`);
     try {
-      await page.goto(`${BASE}${DASHBOARD}`, { waitUntil: 'networkidle', timeout: 30_000 });
+      // domcontentloaded, not networkidle — the carousel card keeps
+      // loading JetPhotos photos indefinitely so networkidle never
+      // settles. Then wait for the actual section headings to appear.
+      await page.goto(`${BASE}${DASHBOARD}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      await page.getByText('Skywatch counts').first().waitFor({ state: 'visible', timeout: 20_000 });
     } catch (err) {
       failures.push(`${vp.name}: navigation failed: ${err.message}`);
       await ctx.close();
