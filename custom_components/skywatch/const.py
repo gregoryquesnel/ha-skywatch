@@ -17,6 +17,9 @@ CONF_MILITARY_CODES: Final = "military_codes"
 CONF_ALERTS_ENABLED: Final = "alerts_enabled"
 CONF_QUIET_HOURS_START: Final = "quiet_hours_start"
 CONF_QUIET_HOURS_END: Final = "quiet_hours_end"
+CONF_TIMEZONE: Final = "timezone"
+CONF_OVERHEAD_DISTANCE_KM: Final = "overhead_distance_km"
+CONF_OVERHEAD_ALTITUDE_FT: Final = "overhead_altitude_ft"
 
 SOURCE_FR24: Final = "fr24"
 
