@@ -44,13 +44,9 @@ run = "scripts/install-to-ha.sh --dry-run"
 description = "Remove ha-skywatch from the live HA (after deleting the config entry in the UI)"
 run = "scripts/uninstall-from-ha.sh"
 
-[tasks."install-deps:smoke"]
-description = "Install pytest + requests so smoke tests can run"
-run = "pip install -U requests websockets pyyaml"
-
 [tasks.smoke]
-description = "HTTP API smoke tests against the live HA (requires HA_TOKEN)"
-run = "pytest tests/smoke -v"
+description = "HTTP smoke checks against the live HA (requires HA_TOKEN)"
+run = "scripts/smoke.sh"
 
 [tasks."deploy:test-dashboard"]
 description = "Deploy the skywatch-test dashboard via WebSocket"

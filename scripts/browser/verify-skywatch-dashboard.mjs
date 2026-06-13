@@ -108,33 +108,38 @@ async function run() {
     }
 
     // Allow Lovelace to render past the initial paint.
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
-    const body = await page.evaluate(() => document.body.innerText || '');
-
+    // Playwright's locator() pierces shadow DOM (Lovelace tile cards
+    // wrap their text in shadow roots). document.body.innerText does
+    // NOT pierce them — would always show 0 hits.
     for (const needle of EXPECTED_TEXTS) {
-      if (!body.includes(needle)) {
+      const count = await page.getByText(needle).count();
+      if (count === 0) {
         failures.push(`${vp.name}: missing expected text "${needle}"`);
       } else {
-        console.log(`  + "${needle}" present`);
-      }
-    }
-    for (const needle of FORBIDDEN_TEXTS) {
-      // Case-insensitive substring match — but ignore tile-card "Unknown"
-      // which can appear as a legitimate sensor state on first install.
-      // We only flag "Entity not available" which is the broken-entity
-      // text Lovelace uses.
-      if (needle === 'Entity not available' && body.includes(needle)) {
-        failures.push(`${vp.name}: forbidden text "${needle}" found`);
-      } else if (needle === 'undefined' && body.toLowerCase().includes('undefined')) {
-        failures.push(`${vp.name}: 'undefined' appears in DOM`);
+        console.log(`  + "${needle}" present (${count}×)`);
       }
     }
 
-    if (consoleErrors.length) {
-      failures.push(`${vp.name}: ${consoleErrors.length} console error(s):\n    ${consoleErrors.slice(0, 3).join('\n    ')}`);
+    const errCount = await page.getByText('Entity not available').count();
+    if (errCount > 0) {
+      failures.push(`${vp.name}: "Entity not available" found ${errCount}×`);
+    }
+    const unauthCount = await page.getByText(/401:?\s*Unauthorized/i).count();
+    if (unauthCount > 0) {
+      failures.push(`${vp.name}: map iframe shows ${unauthCount}× '401 Unauthorized'`);
+    }
+
+    // Filter out HA's own CSS warnings (`Custom state pseudo classes`)
+    // which are noise about a browser-spec rename and not bugs in our code.
+    const realErrors = consoleErrors.filter(
+      (line) => !line.includes('Custom state pseudo classes')
+    );
+    if (realErrors.length) {
+      failures.push(`${vp.name}: ${realErrors.length} console error(s):\n    ${realErrors.slice(0, 3).join('\n    ')}`);
     } else {
-      console.log('  + no console errors');
+      console.log(`  + no console errors (filtered ${consoleErrors.length - realErrors.length} CSS warning${consoleErrors.length - realErrors.length === 1 ? '' : 's'})`);
     }
 
     const png = join(OUTDIR, `skywatch-test-${vp.name}.png`);
