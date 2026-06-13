@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skywatch live map</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #0b0e13;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    .marker-aircraft {
+      background: #4fc3f7;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      width: 14px;
+      height: 14px;
+      box-shadow: 0 0 8px rgba(79, 195, 247, 0.6);
+    }
+    .marker-aircraft.helo { background: #ff9800; box-shadow: 0 0 10px rgba(255,152,0,0.7); }
+    .marker-aircraft.military { background: #f44336; box-shadow: 0 0 10px rgba(244,67,54,0.7); }
+    .marker-aircraft.watch { background: #ab47bc; box-shadow: 0 0 12px rgba(171,71,188,0.8); width: 16px; height: 16px; }
+    .marker-home {
+      background: #cddc39;
+      border: 2px solid #fff;
+      border-radius: 2px;
+      width: 12px;
+      height: 12px;
+    }
+    .legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(11, 14, 19, 0.85);
+      color: #e6e6e6;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 0.85em;
+      line-height: 1.6;
+      z-index: 500;
+    }
+    .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
+    .legend .dot.civ { background: #4fc3f7; }
+    .legend .dot.helo { background: #ff9800; }
+    .legend .dot.mil { background: #f44336; }
+    .legend .dot.watch { background: #ab47bc; }
+    .status {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(11, 14, 19, 0.85);
+      color: #e6e6e6;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8em;
+      z-index: 500;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="legend">
+    <div><span class="dot civ"></span>civil</div>
+    <div><span class="dot helo"></span>helicopter</div>
+    <div><span class="dot mil"></span>military</div>
+    <div><span class="dot watch"></span>watch-list</div>
+  </div>
+  <div class="status" id="status">loading…</div>
+
+  <script>
+    "use strict";
+
+    const REFRESH_MS = 5000;
+    const GEOJSON_URL = "/api/skywatch/flights.geojson";
+
+    let map = null;
+    let homeMarker = null;
+    let radiusCircle = null;
+    let markersById = new Map();
+
+    function categoryOf(props) {
+      if (props.watch_slug) return "watch";
+      if (props.is_military) return "military";
+      if (props.is_helo) return "helo";
+      return "civ";
+    }
+
+    function ensureMap(home, radiusM) {
+      if (map) return;
+      map = L.map("map", { zoomControl: true, attributionControl: false })
+              .setView([home[1], home[0]], 10);
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png",
+        { maxZoom: 18 }
+      ).addTo(map);
+      homeMarker = L.marker([home[1], home[0]], {
+        icon: L.divIcon({ className: "marker-home", iconSize: [12, 12] }),
+      }).addTo(map);
+      radiusCircle = L.circle([home[1], home[0]], {
+        radius: radiusM,
+        color: "#4fc3f7",
+        weight: 1,
+        opacity: 0.4,
+        fillOpacity: 0.04,
+      }).addTo(map);
+    }
+
+    function renderFeatures(features) {
+      const seen = new Set();
+      for (const feature of features) {
+        const [lon, lat] = feature.geometry.coordinates;
+        const props = feature.properties || {};
+        const flightId = props.flight_id || `${props.callsign}_${lat}_${lon}`;
+        seen.add(flightId);
+
+        const cat = categoryOf(props);
+        const popupBody = `
+          <strong>${props.callsign || "?"}</strong><br/>
+          ${props.aircraft_model || props.aircraft_code || "?"}<br/>
+          ${props.altitude_ft != null ? props.altitude_ft + " ft" : ""}
+          ${props.ground_speed_kt != null ? " · " + props.ground_speed_kt + " kt" : ""}
+          ${props.heading != null ? " · " + props.heading + "°" : ""}
+          ${props.watch_label ? "<br/><em>watch: " + props.watch_label + "</em>" : ""}
+        `;
+
+        const existing = markersById.get(flightId);
+        if (existing) {
+          existing.setLatLng([lat, lon]);
+          existing.setPopupContent(popupBody);
+        } else {
+          const marker = L.marker([lat, lon], {
+            icon: L.divIcon({
+              className: `marker-aircraft ${cat}`,
+              iconSize: [14, 14],
+            }),
+          }).addTo(map);
+          marker.bindPopup(popupBody);
+          markersById.set(flightId, marker);
+        }
+      }
+      for (const [id, marker] of markersById.entries()) {
+        if (!seen.has(id)) {
+          map.removeLayer(marker);
+          markersById.delete(id);
+        }
+      }
+    }
+
+    async function tick() {
+      const statusEl = document.getElementById("status");
+      try {
+        const resp = await fetch(GEOJSON_URL, { credentials: "same-origin" });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        if (data.home && data.radius_m != null) ensureMap(data.home, data.radius_m);
+        if (!map) {
+          statusEl.textContent = "skywatch unconfigured";
+          return;
+        }
+        renderFeatures(data.features || []);
+        statusEl.textContent = `${(data.features || []).length} aircraft · ${new Date().toLocaleTimeString()}`;
+      } catch (err) {
+        statusEl.textContent = "error: " + err.message;
+      }
+    }
+
+    tick();
+    setInterval(tick, REFRESH_MS);
+  </script>
+</body>
+</html>
