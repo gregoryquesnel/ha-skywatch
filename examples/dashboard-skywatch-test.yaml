@@ -172,7 +172,7 @@ views:
             heading_style: title
           - type: markdown
             content: |
-              **Rare aircraft** <span style="opacity:0.6;">(seen once)</span>
+              **Rare aircraft** <span style="opacity:0.6;">(seen twice or less)</span>
               {% for a in (state_attr('sensor.skywatch_sightings_all_time','rare_aircraft') or [])[:8] -%}
               - <a href="https://en.wikipedia.org/wiki/Special:Search?search={{ a.aircraft_model | urlencode }}" target="_blank">{{ a.aircraft_model }}</a>
               {% endfor %}

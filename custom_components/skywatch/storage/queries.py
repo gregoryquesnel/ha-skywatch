@@ -188,8 +188,8 @@ def query_stats(conn: sqlite3.Connection, tz: ZoneInfo, now: datetime | None = N
                FROM sightings
                WHERE aircraft_model IS NOT NULL AND aircraft_model <> ''
                GROUP BY aircraft_model
-               HAVING n = 1
-               ORDER BY last_seen DESC LIMIT 10"""
+               HAVING n <= 2
+               ORDER BY n ASC, last_seen DESC LIMIT 10"""
         )
     ]
     return {
