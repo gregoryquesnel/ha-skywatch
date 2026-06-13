@@ -77,7 +77,11 @@ def test_data_dict_has_all_top_level_keys(seeded: sqlite3.Connection) -> None:
         current_search="",
         military_codes=DEFAULT_MILITARY_CODES,
         watch_list=(),
+        currently_in_area_count=2,
     )
+    # Both new active keys present.
+    assert "active_1h" in data
+    assert "active_24h" in data
     expected_keys = {
         "today",
         "stats",
@@ -155,6 +159,33 @@ def test_military_query_uses_supplied_codes(seeded: sqlite3.Connection) -> None:
     )
     # Only C17 in the seeded military codes — the seeded C-17 row qualifies.
     assert data["military"]["count"] == 1
+
+
+def test_active_counts_include_currently_in_area(seeded: sqlite3.Connection) -> None:
+    """User-reported regression: active_1h / active_24h were missing aircraft
+    that are currently in area but haven't generated a sighting row yet.
+    """
+    data_zero = build_data(
+        seeded,
+        tz=REGINA,
+        current_page=1,
+        current_search="",
+        military_codes=DEFAULT_MILITARY_CODES,
+        watch_list=(),
+        currently_in_area_count=0,
+    )
+    data_three = build_data(
+        seeded,
+        tz=REGINA,
+        current_page=1,
+        current_search="",
+        military_codes=DEFAULT_MILITARY_CODES,
+        watch_list=(),
+        currently_in_area_count=3,
+    )
+    # The three in-area aircraft add to both rolling-window counts.
+    assert data_three["active_1h"]["count"] == data_zero["active_1h"]["count"] + 3
+    assert data_three["active_24h"]["count"] == data_zero["active_24h"]["count"] + 3
 
 
 def test_overhead_thresholds_configurable(seeded: sqlite3.Connection) -> None:

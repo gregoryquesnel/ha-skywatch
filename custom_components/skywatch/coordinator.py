@@ -201,6 +201,10 @@ class SkywatchCoordinator(DataUpdateCoordinator):
 
     def _sync_build_data(self) -> dict:
         assert self._conn is not None
+        # Currently-in-area count is read from the source's live snapshot
+        # (FR24's sensor.flightradar24_current_in_area attribute count).
+        # It's safe to call from the executor thread — current_flights()
+        # is sync and just reads HA state machine.
         return build_data(
             self._conn,
             tz=self._tz,
@@ -210,6 +214,7 @@ class SkywatchCoordinator(DataUpdateCoordinator):
             watch_list=self._watch_list,
             overhead_distance_km=self._overhead_distance_km,
             overhead_altitude_ft=self._overhead_altitude_ft,
+            currently_in_area_count=len(self._source.current_flights()),
         )
 
     def _on_entry(self, entry: Entry) -> None:
