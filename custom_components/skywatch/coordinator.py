@@ -97,6 +97,10 @@ class SkywatchCoordinator(DataUpdateCoordinator):
     def helo_codes(self) -> tuple[str, ...]:
         return self._helo_codes
 
+    @property
+    def military_codes(self) -> tuple[str, ...]:
+        return self._military_codes
+
     async def async_setup(self) -> None:
         db_path = Path(self.hass.config.path(DB_SUBDIR)) / DB_FILENAME
         await self.hass.async_add_executor_job(
