@@ -1,0 +1,33 @@
+[tools]
+python = "3.12"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+
+[tasks.setup]
+description = "Install development dependencies into .venv"
+run = "pip install -U pip pytest pytest-asyncio ruff"
+
+[tasks.setup-ha]
+description = "Install pytest-homeassistant-custom-component (for HA-dependent tests, later)"
+run = "pip install pytest-homeassistant-custom-component"
+
+[tasks.test]
+description = "Run unit tests"
+run = "pytest tests/unit -v"
+
+[tasks.test-all]
+description = "Run the full test suite"
+run = "pytest tests -v"
+
+[tasks.cov]
+description = "Run tests with coverage report"
+run = "pytest tests --cov=custom_components/skywatch --cov-report=term-missing"
+
+[tasks.lint]
+description = "Run ruff lint + format check"
+run = ["ruff check custom_components tests", "ruff format --check custom_components tests"]
+
+[tasks.lint-fix]
+description = "Apply ruff fixes + formatting"
+run = ["ruff check --fix custom_components tests", "ruff format custom_components tests"]
