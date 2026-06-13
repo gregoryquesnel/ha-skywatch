@@ -1,0 +1,75 @@
+blueprint:
+  name: Skywatch — Aircraft entry alert
+  description: >
+    Notify when an aircraft enters the skywatch radius. Listens to the
+    integration's source-agnostic `skywatch_sighting` event so the same
+    blueprint works regardless of which backend (FR24, dump1090, etc.)
+    you have configured.
+
+    Optional filters: gate by an input_boolean toggle and/or a
+    helicopter-only flag (`is_helo`). The integration's helo_codes
+    config drives the boolean — no list duplication here.
+  domain: automation
+  source_url: https://github.com/TBD/ha-skywatch/blob/main/blueprints/automation/skywatch/aircraft-entry-alert.yaml
+  input:
+    enable_toggle:
+      name: Enable toggle (optional)
+      description: An input_boolean that gates the alert. Leave empty to always fire.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    helo_only:
+      name: Helicopters only
+      description: Only fire when the aircraft's ICAO code is in the configured helo list.
+      default: false
+      selector:
+        boolean:
+    military_only:
+      name: Military only
+      description: Only fire when the aircraft is in the configured military code list.
+      default: false
+      selector:
+        boolean:
+    notify_service:
+      name: Notification service
+      description: e.g. notify.mobile_app_iphone or notify.persistent_notification
+      selector:
+        text:
+    notify_title:
+      name: Notification title
+      default: Aircraft entering area
+      selector:
+        text:
+
+trigger:
+  - platform: event
+    event_type: skywatch_sighting
+    event_data:
+      kind: entry
+
+variables:
+  enable_toggle: !input enable_toggle
+  helo_only: !input helo_only
+  military_only: !input military_only
+
+condition:
+  - condition: template
+    value_template: >-
+      {{ enable_toggle == '' or is_state(enable_toggle, 'on') }}
+  - condition: template
+    value_template: >-
+      {{ not helo_only or trigger.event.data.is_helo }}
+  - condition: template
+    value_template: >-
+      {{ not military_only or trigger.event.data.is_military }}
+
+action:
+  - service: !input notify_service
+    data:
+      title: !input notify_title
+      message: >-
+        {{ trigger.event.data.callsign or '?' }}
+        ({{ trigger.event.data.aircraft_model or trigger.event.data.aircraft_code or 'unknown' }})
+        entered the skywatch radius.

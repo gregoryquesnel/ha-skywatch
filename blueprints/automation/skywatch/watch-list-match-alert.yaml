@@ -1,0 +1,71 @@
+blueprint:
+  name: Skywatch — Watch-list match alert
+  description: >
+    Notify when one of your watch-list aircraft is observed. The
+    integration tags each event with `watch_slug` and `watch_label`
+    when a watch entry matches — this blueprint either fires on any
+    match, or on matches against one specific slug.
+
+    Pairs with the watch list edited via the Skywatch integration's
+    options flow (each entry has a slug + label + match criteria).
+  domain: automation
+  source_url: https://github.com/TBD/ha-skywatch/blob/main/blueprints/automation/skywatch/watch-list-match-alert.yaml
+  input:
+    watch_slug:
+      name: Watch slug (optional)
+      description: >
+        If set, only fire for this specific watch entry. Leave empty to
+        notify on any watch match.
+      default: ""
+      selector:
+        text:
+    on_kinds:
+      name: Event kinds to alert on
+      description: Which lifecycle events should trigger the alert.
+      default:
+        - entry
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: Entered area
+              value: entry
+            - label: Exited area
+              value: exit
+            - label: Landed at tracked airport
+              value: landed
+            - label: Took off from tracked airport
+              value: took_off
+    notify_service:
+      name: Notification service
+      selector:
+        text:
+
+trigger:
+  - platform: event
+    event_type: skywatch_sighting
+
+variables:
+  watch_slug: !input watch_slug
+  on_kinds: !input on_kinds
+
+condition:
+  - condition: template
+    value_template: >-
+      {{ trigger.event.data.watch_slug is not none }}
+  - condition: template
+    value_template: >-
+      {{ watch_slug == '' or trigger.event.data.watch_slug == watch_slug }}
+  - condition: template
+    value_template: >-
+      {{ trigger.event.data.kind in on_kinds }}
+
+action:
+  - service: !input notify_service
+    data:
+      title: >-
+        {{ trigger.event.data.watch_label or trigger.event.data.watch_slug }}
+      message: >-
+        {{ trigger.event.data.kind | capitalize }} —
+        {{ trigger.event.data.callsign or trigger.event.data.aircraft_code or 'unknown' }}
+        ({{ trigger.event.data.aircraft_model or '?' }}).

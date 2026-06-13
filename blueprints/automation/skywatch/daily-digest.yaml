@@ -1,0 +1,71 @@
+blueprint:
+  name: Skywatch — Daily digest
+  description: >
+    Send a once-a-day notification summarizing the day's skywatch
+    activity: total sightings today, top routes, top airlines, military
+    count, and overhead-pass count. Pulls from the integration's
+    coordinator sensors.
+
+    Schedule defaults to local 19:00; override with the time input.
+  domain: automation
+  source_url: https://github.com/TBD/ha-skywatch/blob/main/blueprints/automation/skywatch/daily-digest.yaml
+  input:
+    digest_time:
+      name: Time of day
+      description: When to send the digest (local time).
+      default: "19:00:00"
+      selector:
+        time:
+    notify_service:
+      name: Notification service
+      selector:
+        text:
+    today_sensor:
+      name: Sightings today sensor
+      description: Should be sensor.skywatch_log_today.
+      default: sensor.skywatch_log_today
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    overhead_sensor:
+      name: Overhead sightings sensor
+      default: sensor.skywatch_log_overhead
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    military_sensor:
+      name: Military sightings sensor
+      default: sensor.skywatch_military_sightings
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    stats_sensor:
+      name: Stats sensor (top airlines / aircraft)
+      default: sensor.skywatch_log_stats
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+
+trigger:
+  - platform: time
+    at: !input digest_time
+
+variables:
+  today_sensor: !input today_sensor
+  overhead_sensor: !input overhead_sensor
+  military_sensor: !input military_sensor
+  stats_sensor: !input stats_sensor
+
+action:
+  - service: !input notify_service
+    data:
+      title: Skywatch — daily digest
+      message: >-
+        {{ states(today_sensor) }} sightings today
+        ({{ states(overhead_sensor) }} overhead,
+        {{ states(military_sensor) }} military).
+        Top airlines today: {{ state_attr(stats_sensor, 'top_airlines') | map(attribute='airline') | list | join(', ') }}.
