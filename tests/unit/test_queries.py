@@ -93,6 +93,19 @@ def seeded(db_conn: sqlite3.Connection) -> sqlite3.Connection:
             aircraft_model="Lancair IV",
             registration="N777XX",
         ),
+        # Aircraft seen twice (boundary case for the rare <=2 query).
+        Sighting(
+            exit_time=base - timedelta(days=11),
+            aircraft_code="P3",
+            aircraft_model="Lockheed P-3 Orion",
+            registration="USN001",
+        ),
+        Sighting(
+            exit_time=base - timedelta(days=12),
+            aircraft_code="P3",
+            aircraft_model="Lockheed P-3 Orion",
+            registration="USN002",
+        ),
     ]
     for s in seedlings:
         insert_sighting(db_conn, s)
@@ -131,9 +144,9 @@ class TestRecent:
             "page_size",
             "total_count",
         }
-        assert result["total_count"] == 5
+        assert result["total_count"] == 7
         assert result["page_size"] == 10
-        assert len(result["sightings"]) == 5
+        assert len(result["sightings"]) == 7
 
     def test_sighting_rows_are_decorated(self, seeded: sqlite3.Connection) -> None:
         rows = query_recent(seeded, page=1, tz=REGINA)["sightings"]
@@ -184,7 +197,8 @@ class TestSearch:
 class TestStats:
     def test_total_matches_seedling_count(self, seeded: sqlite3.Connection) -> None:
         result = query_stats(seeded, tz=REGINA, now=datetime(2026, 6, 13, 23, 0, tzinfo=UTC))
-        assert result["count"] == 5
+        # 5 single-sighting models + 2 P-3 Orion rows = 7
+        assert result["count"] == 7
 
     def test_top_airlines_present_and_sorted(self, seeded: sqlite3.Connection) -> None:
         result = query_stats(seeded, tz=REGINA)
@@ -192,11 +206,27 @@ class TestStats:
         airlines = [r["airline"] for r in result["top_airlines"]]
         assert "Air Canada" in airlines
 
-    def test_rare_aircraft_only_seen_once(self, seeded: sqlite3.Connection) -> None:
+    def test_rare_aircraft_seen_twice_or_less(self, seeded: sqlite3.Connection) -> None:
         result = query_stats(seeded, tz=REGINA)
-        # Lancair IV: seen exactly once in seedlings.
-        models = [r["aircraft_model"] for r in result["rare_aircraft"]]
+        rare = result["rare_aircraft"]
+        models = [r["aircraft_model"] for r in rare]
+        # Lancair IV: 1 sighting.
         assert "Lancair IV" in models
+        # Lockheed P-3 Orion: 2 sightings — boundary of the rare query.
+        assert "Lockheed P-3 Orion" in models
+        # Verify the n counts on those entries.
+        by_model = {r["aircraft_model"]: r["n"] for r in rare}
+        assert by_model["Lancair IV"] == 1
+        assert by_model["Lockheed P-3 Orion"] == 2
+
+    def test_rare_aircraft_orders_singletons_first(self, seeded: sqlite3.Connection) -> None:
+        result = query_stats(seeded, tz=REGINA)
+        rare = result["rare_aircraft"]
+        # The query orders by n ASC then last_seen DESC, so every n=1
+        # row appears before any n=2 row.
+        last_n1_index = max((i for i, r in enumerate(rare) if r["n"] == 1), default=-1)
+        first_n2_index = min((i for i, r in enumerate(rare) if r["n"] == 2), default=len(rare))
+        assert last_n1_index < first_n2_index
 
 
 class TestTopRoutes:
@@ -293,7 +323,7 @@ class TestHourHistogram:
         result = query_hour_histogram(seeded, tz=REGINA)
         assert len(result["buckets"]) == 24
         # Sum of bucket counts equals total sightings.
-        assert sum(b["n"] for b in result["buckets"]) == 5
+        assert sum(b["n"] for b in result["buckets"]) == 7
 
     def test_max_n_is_largest_bucket(self, seeded: sqlite3.Connection) -> None:
         result = query_hour_histogram(seeded, tz=REGINA)
