@@ -36,7 +36,7 @@ views:
           - type: tile
             entity: sensor.skywatch_military_sightings
             name: Military sightings
-            icon: mdi:airplane-shield
+            icon: mdi:shield-airplane
           - type: tile
             entity: sensor.skywatch_airport_movements_today
             name: Airport movements today
