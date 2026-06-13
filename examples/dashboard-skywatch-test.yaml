@@ -190,9 +190,21 @@ views:
           - type: tile
             entity: number.skywatch_sightings_page
             name: Page
+            # `style: buttons` is essential — without it the feature
+            # defaults to a slider, which for the 1–9999 page range
+            # is unusably imprecise. With buttons the user gets +/-
+            # for adjacent navigation, plus tap-the-value to bring
+            # up a numeric keyboard for jumping directly to any page.
             features:
               - type: numeric-input
+                style: buttons
             features_position: bottom
+            # Bonus: tap the icon → reset to page 1 (jump to top of log).
+            icon_tap_action:
+              action: perform-action
+              perform_action: skywatch.set_page
+              data:
+                page: 1
             grid_options:
               columns: 6
               rows: 2
