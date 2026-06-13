@@ -8,11 +8,14 @@ involvement, no async fixtures.
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from ..const import DEFAULT_ENTRY_TTL_HOURS
 from ..models import Entry, Movement, Sighting
 from .normalizers import normalize_photo_url
+
+DEFAULT_TRAIL_RETENTION_MINUTES = 30
 
 
 def _iso(dt: datetime) -> str:
@@ -111,6 +114,66 @@ def insert_sighting(conn: sqlite3.Connection, sighting: Sighting) -> int:
         ),
     )
     return int(cursor.lastrowid or 0)
+
+
+def insert_positions(
+    conn: sqlite3.Connection,
+    positions: Iterable[tuple[str, datetime, float, float]],
+) -> int:
+    """Bulk-insert (flight_id, ts, lat, lon) tuples.
+
+    Composite PRIMARY KEY (flight_id, ts) means two captures within the
+    same wall-clock second collide. INSERT OR IGNORE absorbs the
+    conflict — the existing row stays, the duplicate is dropped. Returns
+    the number of rows actually inserted.
+    """
+    rows = [(fid, _iso(ts), float(lat), float(lon)) for fid, ts, lat, lon in positions]
+    if not rows:
+        return 0
+    cursor = conn.executemany(
+        "INSERT OR IGNORE INTO flight_positions (flight_id, ts, lat, lon) VALUES (?, ?, ?, ?)",
+        rows,
+    )
+    return cursor.rowcount
+
+
+def prune_old_positions(
+    conn: sqlite3.Connection,
+    now: datetime | None = None,
+    retention_minutes: int = DEFAULT_TRAIL_RETENTION_MINUTES,
+) -> int:
+    """Delete positions older than `retention_minutes` minutes from now."""
+    if now is None:
+        now = datetime.now(UTC)
+    cutoff = (
+        (now - timedelta(minutes=retention_minutes)).astimezone(UTC).isoformat(timespec="seconds")
+    )
+    cursor = conn.execute("DELETE FROM flight_positions WHERE ts < ?", (cutoff,))
+    return cursor.rowcount
+
+
+def fetch_trails(
+    conn: sqlite3.Connection, flight_ids: Iterable[str]
+) -> dict[str, list[list[float]]]:
+    """Return dict[flight_id → list of [lon, lat] points], oldest first.
+
+    Aircraft with no rows (yet to register a sample) get an empty list.
+    Coordinate ordering matches GeoJSON convention: [lon, lat], not the
+    Leaflet [lat, lon] order — the map's JS converts before drawing.
+    """
+    ids = list(flight_ids)
+    out: dict[str, list[list[float]]] = {fid: [] for fid in ids}
+    if not ids:
+        return out
+    placeholders = ",".join(["?"] * len(ids))
+    rows = conn.execute(
+        f"SELECT flight_id, lon, lat FROM flight_positions "
+        f"WHERE flight_id IN ({placeholders}) ORDER BY ts ASC",
+        tuple(ids),
+    )
+    for fid, lon, lat in rows:
+        out[fid].append([lon, lat])
+    return out
 
 
 def insert_movement(conn: sqlite3.Connection, movement: Movement) -> int:

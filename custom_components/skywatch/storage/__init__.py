@@ -23,9 +23,12 @@ from .queries import (
     query_watch_aircraft,
 )
 from .repository import (
+    fetch_trails,
     insert_entry,
     insert_movement,
+    insert_positions,
     insert_sighting,
+    prune_old_positions,
     prune_stale_entries,
     take_entry_time,
 )
@@ -35,12 +38,15 @@ __all__ = [
     "SCHEMA_VERSION",
     "coerce_float",
     "coerce_int",
+    "fetch_trails",
     "insert_entry",
     "insert_movement",
+    "insert_positions",
     "insert_sighting",
     "normalize_photo_url",
     "open_db",
     "parse_iso",
+    "prune_old_positions",
     "prune_stale_entries",
     "query_active_1h",
     "query_active_24h",

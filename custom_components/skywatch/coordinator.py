@@ -16,21 +16,25 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .classify import is_helicopter, is_military, match_watch
 from .const import DB_FILENAME, DB_SUBDIR, EVENT_SKYWATCH_SIGHTING
 from .data_builder import build_data
 from .storage import (
+    fetch_trails,
     insert_entry,
     insert_movement,
+    insert_positions,
     insert_sighting,
     open_db,
+    prune_old_positions,
     prune_stale_entries,
     take_entry_time,
 )
@@ -48,6 +52,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 UPDATE_INTERVAL = timedelta(seconds=30)
+TRAIL_CAPTURE_INTERVAL = timedelta(seconds=5)
 
 
 class SkywatchCoordinator(DataUpdateCoordinator):
@@ -84,6 +89,7 @@ class SkywatchCoordinator(DataUpdateCoordinator):
         self._current_page = 1
         self._current_search = ""
         self._unsub_source_listeners: list = []
+        self._unsub_trail_capture = None
 
     @property
     def source(self) -> Source:
@@ -114,9 +120,19 @@ class SkywatchCoordinator(DataUpdateCoordinator):
             self._source.on_landing(self._on_landing),
             self._source.on_takeoff(self._on_takeoff),
         ]
+        # Fast trail-capture loop: every 5 s sample every in-area flight's
+        # lat/lon into flight_positions, then prune anything > 30 min old.
+        # Independent of the 30 s data refresh — trails need finer
+        # resolution.
+        self._unsub_trail_capture = async_track_time_interval(
+            self.hass, self._capture_positions, TRAIL_CAPTURE_INTERVAL
+        )
         await self.async_config_entry_first_refresh()
 
     async def async_unload(self) -> None:
+        if self._unsub_trail_capture is not None:
+            self._unsub_trail_capture()
+            self._unsub_trail_capture = None
         for unsub in self._unsub_source_listeners:
             unsub()
         self._unsub_source_listeners = []
@@ -124,6 +140,43 @@ class SkywatchCoordinator(DataUpdateCoordinator):
         if self._conn is not None:
             await self.hass.async_add_executor_job(self._conn.close)
             self._conn = None
+
+    async def async_fetch_trails(self, flight_ids: list[str]) -> dict[str, list[list[float]]]:
+        """Trail polylines for the given flight ids — used by the GeoJSON view."""
+        if self._conn is None or not flight_ids:
+            return {}
+        return await self.hass.async_add_executor_job(fetch_trails, self._conn, flight_ids)
+
+    async def _capture_positions(self, _now=None) -> None:
+        """Trail capture tick — sample positions + persist + prune.
+
+        Async so async_track_time_interval awaits the persistence
+        directly. Earlier sync + async_create_task pattern dropped the
+        coroutine on the floor in HA 2026 (RuntimeWarning: never awaited).
+        """
+        if self._conn is None:
+            return
+        flights = self._source.current_flights()
+        capture_time = datetime.now(UTC)
+        rows: list[tuple[str, datetime, float, float]] = []
+        for flight in flights:
+            fid = flight.get("id") or flight.get("callsign") or flight.get("flight_number")
+            lat = flight.get("latitude")
+            lon = flight.get("longitude")
+            if not fid or lat is None or lon is None:
+                continue
+            try:
+                rows.append((str(fid), capture_time, float(lat), float(lon)))
+            except (TypeError, ValueError):
+                continue
+        if rows:
+            await self.hass.async_add_executor_job(self._sync_persist_positions, rows)
+
+    def _sync_persist_positions(self, rows: list[tuple[str, datetime, float, float]]) -> None:
+        assert self._conn is not None
+        insert_positions(self._conn, rows)
+        prune_old_positions(self._conn)
+        self._conn.commit()
 
     async def async_set_page(self, page: int) -> None:
         self._current_page = max(1, int(page))
