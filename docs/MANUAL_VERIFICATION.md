@@ -79,24 +79,36 @@ If row counts mismatch, **stop** and root-cause before going further.
 
 ## 3. hassfest + HACS validator (5 min, requires Docker)
 
-Both validators run as containers and need no live HA.
+**hassfest** (file-based, runs locally):
+
+```bash
+docker run --rm \
+  -v "$PWD/custom_components/skywatch":/github/workspace/skywatch \
+  ghcr.io/home-assistant/hassfest:latest \
+  --integration-path /github/workspace/skywatch
+# Expected: "Invalid integrations: 0". Fails on bad manifest.json,
+# missing translations key, requirements not pinned, manifest key
+# order, etc.
+```
+
+This was already run locally and passed at the v0.0.1 baseline.
+
+**HACS action** (needs GitHub API; **requires the repo to exist** —
+defer until after first push):
 
 ```bash
 docker run --rm \
   -v "$PWD":/github/workspace \
-  ghcr.io/home-assistant/hassfest:latest
-# Expected: exit 0. Fails on bad manifest.json, missing strings.json key,
-# requirements not pinned, etc.
-
-docker run --rm \
-  -v "$PWD":/github/workspace \
   -e INPUT_CATEGORY=integration \
+  -e INPUT_GITHUB_TOKEN="$(gh auth token)" \
   -e GITHUB_REPOSITORY=<your-handle>/ha-skywatch \
   ghcr.io/hacs/action:main
-# Expected: exit 0. Fails on missing hacs.json, missing README, etc.
 ```
 
-Both should exit 0. Persistent failures are blockers.
+On a yet-to-be-created repo this fails with `GitHubNotFoundException`.
+Run it **after** step 10 (the first push) when the repo exists. Or
+rely on the HACS GitHub Action to run it automatically on every PR
+once you've wired up `.github/workflows/validate.yml`.
 
 ## 4. Disposable HA Docker — full install + config flow (15 min)
 
