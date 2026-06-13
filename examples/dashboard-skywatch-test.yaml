@@ -187,36 +187,41 @@ views:
           - type: heading
             heading: Sightings controls
             heading_style: title
-          - type: button
-            name: Prev
-            icon: mdi:chevron-left
-            tap_action:
-              action: call-service
-              service: skywatch.set_page
-              data:
-                page: "{{ [(state_attr('sensor.skywatch_recent_sightings', 'page') or 1) - 1, 1] | max }}"
+          - type: tile
+            entity: number.skywatch_sightings_page
+            name: Page
+            features:
+              - type: numeric-input
+            features_position: bottom
             grid_options:
-              columns: 4
+              columns: 6
+              rows: 2
+          - type: tile
+            entity: switch.skywatch_alerts_enabled
+            name: Alerts
+            grid_options:
+              columns: 6
               rows: 1
-          - type: markdown
-            content: |
-              <div style="text-align:center;font-size:1.1em;padding-top:0.5em;">
-              <strong>Page {{ state_attr('sensor.skywatch_recent_sightings', 'page') or 1 }}</strong>
-              of {{ state_attr('sensor.skywatch_recent_sightings', 'total_pages') or 1 }}
-              </div>
+          - type: entities
+            entities:
+              - entity: text.skywatch_search_term
+                name: Search sightings
             grid_options:
-              columns: 4
-              rows: 1
-          - type: button
-            name: Next
-            icon: mdi:chevron-right
+              columns: full
+          - type: tile
+            entity: button.skywatch_clear_search
+            name: Clear search
+            icon: mdi:close-circle-outline
             tap_action:
-              action: call-service
-              service: skywatch.set_page
-              data:
-                page: "{{ [(state_attr('sensor.skywatch_recent_sightings', 'page') or 1) + 1, state_attr('sensor.skywatch_recent_sightings', 'total_pages') or 1] | min }}"
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.skywatch_clear_search
+            visibility:
+              - condition: template
+                value_template: "{{ (states('text.skywatch_search_term') | default('')) | trim | length > 0 }}"
             grid_options:
-              columns: 4
+              columns: full
               rows: 1
 
       - type: grid

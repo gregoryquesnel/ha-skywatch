@@ -37,7 +37,14 @@ if TYPE_CHECKING:
 # the package importable without homeassistant installed — pure-Python
 # unit tests for storage / classify / data_builder traverse this module
 # during pytest collection.
-PLATFORMS: list[str] = ["sensor", "binary_sensor"]
+PLATFORMS: list[str] = [
+    "sensor",
+    "binary_sensor",
+    "number",
+    "text",
+    "switch",
+    "button",
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
