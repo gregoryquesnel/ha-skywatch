@@ -19,8 +19,14 @@ def open_db(path: Path) -> sqlite3.Connection:
     The parent directory must exist — the caller is responsible for
     `mkdir`ing it. Returns a Connection with row_factory=Row so callers
     can use column-name access in result dicts.
+
+    check_same_thread=False lets HA's executor pool hand off the same
+    connection across threads. The coordinator serializes all writes
+    through hass.async_add_executor_job (one job at a time per executor
+    pool), so concurrent-use safety is enforced at the call-site level
+    rather than by sqlite's per-thread guard.
     """
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA foreign_keys = ON")

@@ -40,11 +40,19 @@ if TYPE_CHECKING:
 
 
 class SkywatchFlightsGeoJSONView(HomeAssistantView):
-    """Live GeoJSON snapshot for the Leaflet map."""
+    """Live GeoJSON snapshot for the Leaflet map.
+
+    requires_auth=False so the Leaflet iframe (served at /api/skywatch/map)
+    can fetch it without same-origin cookie tricks. Exposes only the same
+    flight data the FR24 sensor already surfaces — no credentials, no
+    private state. HA still enforces the same-origin policy via the
+    cors_allowed_origins setting if the user wants to lock external
+    access.
+    """
 
     url = "/api/skywatch/flights.geojson"
     name = "api:skywatch:flights_geojson"
-    requires_auth = True
+    requires_auth = False
 
     def __init__(self, hass: HomeAssistant) -> None:
         self._hass = hass
@@ -108,11 +116,16 @@ class SkywatchFlightsGeoJSONView(HomeAssistantView):
 
 
 class SkywatchMapView(HomeAssistantView):
-    """Static Leaflet page — served from www/skywatch-map.html."""
+    """Static Leaflet page — served from www/skywatch-map.html.
+
+    requires_auth=False so the page renders inside Lovelace iframes
+    (which don't forward HA's auth cookie). The HTML is static and
+    doesn't expose any state.
+    """
 
     url = "/api/skywatch/map"
     name = "api:skywatch:map"
-    requires_auth = True
+    requires_auth = False
 
     def __init__(self, hass: HomeAssistant) -> None:
         self._hass = hass

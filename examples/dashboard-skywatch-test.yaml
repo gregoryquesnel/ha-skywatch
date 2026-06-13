@@ -5,6 +5,11 @@
 # labels Playwright can assert against. Doesn't reference any flightradar-
 # flight-card or other HACS plugins so it works on any HA install with
 # just Skywatch loaded.
+#
+# NOTE: v0.1 entity IDs lack the `skywatch_` prefix because the
+# platforms don't yet set `_attr_device_info`. v0.2 will add device info
+# and the IDs will become `sensor.skywatch_*`. Either rev of the YAML
+# will work — just update the entity IDs as needed.
 views:
   - title: Skywatch Test
     path: skywatch-test
@@ -18,31 +23,31 @@ views:
             heading: Skywatch counts
             heading_style: title
           - type: tile
-            entity: sensor.skywatch_log_today
+            entity: sensor.sightings_today
             name: Sightings today
             icon: mdi:calendar-today
           - type: tile
-            entity: sensor.skywatch_log_this_week
+            entity: sensor.sightings_this_week
             name: Sightings this week
             icon: mdi:calendar-week
           - type: tile
-            entity: sensor.skywatch_log_stats
+            entity: sensor.sightings_all_time
             name: Sightings all-time
             icon: mdi:database
           - type: tile
-            entity: sensor.skywatch_log_overhead
+            entity: sensor.overhead_sightings
             name: Overhead transits
             icon: mdi:airplane
           - type: tile
-            entity: sensor.skywatch_military_sightings
+            entity: sensor.military_sightings
             name: Military sightings
             icon: mdi:airplane-shield
           - type: tile
-            entity: sensor.skywatch_movements_today
+            entity: sensor.airport_movements_today
             name: Airport movements today
             icon: mdi:airport
           - type: tile
-            entity: sensor.skywatch_flights_in_area
+            entity: sensor.aircraft_in_area
             name: Aircraft in area now
             icon: mdi:radar
 
@@ -52,11 +57,11 @@ views:
             heading: Skywatch state
             heading_style: title
           - type: tile
-            entity: binary_sensor.skywatch_has_aircraft
+            entity: binary_sensor.aircraft_present
             name: Aircraft present
             icon: mdi:airplane
           - type: tile
-            entity: binary_sensor.skywatch_helicopter_overhead
+            entity: binary_sensor.helicopter_overhead
             name: Helicopter overhead
             icon: mdi:helicopter
 
