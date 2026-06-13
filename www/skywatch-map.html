@@ -226,9 +226,17 @@
       if (map) return;
       map = L.map("map", { zoomControl: true, attributionControl: false })
               .setView([home[1], home[0]], 10);
+      // Match ha-tinker exactly: dark_nolabels is significantly darker
+      // than the default 'dark_matter' which renders nearly-light-grey
+      // in rural regions (no roads to highlight). subdomains: 'abcd'
+      // is required by CartoCDN per their docs.
       L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png",
-        { maxZoom: 18 }
+        "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
+        {
+          maxZoom: 19,
+          subdomains: "abcd",
+          attribution: "© OSM · © CARTO",
+        }
       ).addTo(map);
 
       // Home + AOI ring

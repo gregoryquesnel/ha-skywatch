@@ -90,6 +90,37 @@ views:
       - type: grid
         cards:
           - type: heading
+            heading: In-area carousel
+            heading_style: title
+          - type: custom:flightradar-flight-card
+            entities:
+              - entity_id: sensor.flightradar24_current_in_area
+                title: In Area Now
+              - entity_id: sensor.flightradar24_entered_area
+                title: Just Entered
+              - entity_id: sensor.flightradar24_exited_area
+                title: Just Exited
+              - entity_id: sensor.flightradar24_additional_tracked
+                title: Tracked
+            units:
+              altitude: ft
+              distance: km
+              ground_speed: kmh
+            show_flightradar_link: true
+            show_airline_info_column: true
+            show_airline_logo: true
+            show_aircraft_photo: true
+            show_progress_bar: true
+            carousel:
+              enable: true
+              show_controls: true
+              loop: true
+            grid_options:
+              columns: full
+
+      - type: grid
+        cards:
+          - type: heading
             heading: Hour-of-day distribution
             heading_style: title
           - type: markdown
