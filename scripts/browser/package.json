@@ -1,0 +1,12 @@
+{
+  "name": "ha-skywatch-browser-tests",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node verify-skywatch-dashboard.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.49.0"
+  }
+}

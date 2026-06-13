@@ -31,3 +31,41 @@ run = ["ruff check custom_components tests", "ruff format --check custom_compone
 [tasks.lint-fix]
 description = "Apply ruff fixes + formatting"
 run = ["ruff check --fix custom_components tests", "ruff format custom_components tests"]
+
+[tasks.install]
+description = "Install ha-skywatch into the live HA (SCP + restart)"
+run = "scripts/install-to-ha.sh"
+
+[tasks."install:dry-run"]
+description = "Preview what install would copy without changing anything"
+run = "scripts/install-to-ha.sh --dry-run"
+
+[tasks.uninstall]
+description = "Remove ha-skywatch from the live HA (after deleting the config entry in the UI)"
+run = "scripts/uninstall-from-ha.sh"
+
+[tasks."install-deps:smoke"]
+description = "Install pytest + requests so smoke tests can run"
+run = "pip install -U requests websockets pyyaml"
+
+[tasks.smoke]
+description = "HTTP API smoke tests against the live HA (requires HA_TOKEN)"
+run = "pytest tests/smoke -v"
+
+[tasks."deploy:test-dashboard"]
+description = "Deploy the skywatch-test dashboard via WebSocket"
+run = "python scripts/deploy-test-dashboard.py"
+
+[tasks."delete:test-dashboard"]
+description = "Remove the skywatch-test dashboard"
+run = "python scripts/delete-test-dashboard.py"
+
+[tasks."setup:browser"]
+description = "Install Playwright + Chromium (~500 MB) for verify:browser"
+dir = "scripts/browser"
+run = ["npm install", "npx playwright install chromium"]
+
+[tasks."verify:browser"]
+description = "Playwright smoke test against the deployed skywatch-test dashboard"
+dir = "scripts/browser"
+run = "node verify-skywatch-dashboard.mjs"

@@ -1,0 +1,72 @@
+# Minimal test dashboard for Skywatch — deploy via:
+#   mise run deploy:test-dashboard
+#
+# Renders only the entities the integration provides, with clear text
+# labels Playwright can assert against. Doesn't reference any flightradar-
+# flight-card or other HACS plugins so it works on any HA install with
+# just Skywatch loaded.
+views:
+  - title: Skywatch Test
+    path: skywatch-test
+    icon: mdi:airplane
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Skywatch counts
+            heading_style: title
+          - type: tile
+            entity: sensor.skywatch_log_today
+            name: Sightings today
+            icon: mdi:calendar-today
+          - type: tile
+            entity: sensor.skywatch_log_this_week
+            name: Sightings this week
+            icon: mdi:calendar-week
+          - type: tile
+            entity: sensor.skywatch_log_stats
+            name: Sightings all-time
+            icon: mdi:database
+          - type: tile
+            entity: sensor.skywatch_log_overhead
+            name: Overhead transits
+            icon: mdi:airplane
+          - type: tile
+            entity: sensor.skywatch_military_sightings
+            name: Military sightings
+            icon: mdi:airplane-shield
+          - type: tile
+            entity: sensor.skywatch_movements_today
+            name: Airport movements today
+            icon: mdi:airport
+          - type: tile
+            entity: sensor.skywatch_flights_in_area
+            name: Aircraft in area now
+            icon: mdi:radar
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Skywatch state
+            heading_style: title
+          - type: tile
+            entity: binary_sensor.skywatch_has_aircraft
+            name: Aircraft present
+            icon: mdi:airplane
+          - type: tile
+            entity: binary_sensor.skywatch_helicopter_overhead
+            name: Helicopter overhead
+            icon: mdi:helicopter
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Live map
+            heading_style: title
+          - type: iframe
+            url: /api/skywatch/map
+            grid_options:
+              columns: full
+              rows: 8
