@@ -48,6 +48,11 @@ const EXPECTED_TEXTS = [
   'Aircraft present',
   'Helicopter overhead',
   'Live map',
+  // v0.2 Tier 1 polish — read existing sensor attributes
+  'Hour-of-day distribution',
+  'Top routes',
+  'Rare aircraft',
+  'Recent sightings',
 ];
 
 const FORBIDDEN_TEXTS = [
