@@ -1,0 +1,16 @@
+import_legacy_db:
+  name: Import legacy sky_sightings.db
+  description: >-
+    One-shot migration of a ha-tinker (pre-skywatch) sky_sightings.db
+    into the skywatch DB. Copies sightings + entries + airport_movements
+    rows, applying the v1 schema migration. Fails loudly if either DB
+    is unreachable or if any expected legacy table is missing.
+  fields:
+    source_path:
+      name: Source path
+      description: Absolute path to the legacy DB (default /config/sky_sightings.db).
+      required: false
+      default: /config/sky_sightings.db
+      example: /config/sky_sightings.db
+      selector:
+        text:
