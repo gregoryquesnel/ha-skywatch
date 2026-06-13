@@ -51,23 +51,23 @@ check_url() {
 
 echo "==> Entity existence + state"
 for e in \
-  sensor.sightings_today \
-  sensor.sightings_this_week \
-  sensor.sightings_all_time \
-  sensor.recent_sightings \
-  sensor.overhead_sightings \
-  sensor.airport_movements_today \
-  sensor.aircraft_in_area \
-  binary_sensor.aircraft_present \
-  binary_sensor.helicopter_overhead
+  sensor.skywatch_sightings_today \
+  sensor.skywatch_sightings_this_week \
+  sensor.skywatch_sightings_all_time \
+  sensor.skywatch_recent_sightings \
+  sensor.skywatch_overhead_sightings \
+  sensor.skywatch_airport_movements_today \
+  sensor.skywatch_aircraft_in_area \
+  binary_sensor.skywatch_aircraft_present \
+  binary_sensor.skywatch_helicopter_overhead
 do
   check "${e}" check_state_exists "$e"
 done
 
 echo "==> Attribute shape"
-check "sensor.recent_sightings has 'page' attr" check_attr sensor.recent_sightings page
-check "sensor.recent_sightings has 'total_pages' attr" check_attr sensor.recent_sightings total_pages
-check "sensor.sightings_all_time has 'top_airlines' attr" check_attr sensor.sightings_all_time top_airlines
+check "sensor.skywatch_recent_sightings has 'page' attr" check_attr sensor.skywatch_recent_sightings page
+check "sensor.skywatch_recent_sightings has 'total_pages' attr" check_attr sensor.skywatch_recent_sightings total_pages
+check "sensor.skywatch_sightings_all_time has 'top_airlines' attr" check_attr sensor.skywatch_sightings_all_time top_airlines
 
 echo "==> HTTP views"
 check_geojson_type() {

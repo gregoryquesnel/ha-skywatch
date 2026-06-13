@@ -1,15 +1,8 @@
 # Minimal test dashboard for Skywatch — deploy via:
 #   mise run deploy:test-dashboard
 #
-# Renders only the entities the integration provides, with clear text
-# labels Playwright can assert against. Doesn't reference any flightradar-
-# flight-card or other HACS plugins so it works on any HA install with
-# just Skywatch loaded.
-#
-# NOTE: v0.1 entity IDs lack the `skywatch_` prefix because the
-# platforms don't yet set `_attr_device_info`. v0.2 will add device info
-# and the IDs will become `sensor.skywatch_*`. Either rev of the YAML
-# will work — just update the entity IDs as needed.
+# Pure-skywatch dashboard with clear text labels Playwright can assert
+# against. Uses `skywatch_` prefixed entity IDs (v0.1.1+).
 views:
   - title: Skywatch Test
     path: skywatch-test
@@ -23,31 +16,31 @@ views:
             heading: Skywatch counts
             heading_style: title
           - type: tile
-            entity: sensor.sightings_today
+            entity: sensor.skywatch_sightings_today
             name: Sightings today
             icon: mdi:calendar-today
           - type: tile
-            entity: sensor.sightings_this_week
+            entity: sensor.skywatch_sightings_this_week
             name: Sightings this week
             icon: mdi:calendar-week
           - type: tile
-            entity: sensor.sightings_all_time
+            entity: sensor.skywatch_sightings_all_time
             name: Sightings all-time
             icon: mdi:database
           - type: tile
-            entity: sensor.overhead_sightings
+            entity: sensor.skywatch_overhead_sightings
             name: Overhead transits
             icon: mdi:airplane
           - type: tile
-            entity: sensor.military_sightings
+            entity: sensor.skywatch_military_sightings
             name: Military sightings
             icon: mdi:airplane-shield
           - type: tile
-            entity: sensor.airport_movements_today
+            entity: sensor.skywatch_airport_movements_today
             name: Airport movements today
             icon: mdi:airport
           - type: tile
-            entity: sensor.aircraft_in_area
+            entity: sensor.skywatch_aircraft_in_area
             name: Aircraft in area now
             icon: mdi:radar
 
@@ -57,11 +50,11 @@ views:
             heading: Skywatch state
             heading_style: title
           - type: tile
-            entity: binary_sensor.aircraft_present
+            entity: binary_sensor.skywatch_aircraft_present
             name: Aircraft present
             icon: mdi:airplane
           - type: tile
-            entity: binary_sensor.helicopter_overhead
+            entity: binary_sensor.skywatch_helicopter_overhead
             name: Helicopter overhead
             icon: mdi:helicopter
 

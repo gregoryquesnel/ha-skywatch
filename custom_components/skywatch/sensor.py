@@ -18,6 +18,7 @@ from homeassistant.components.sensor import SensorEntity, SensorEntityDescriptio
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._device import build_device_info
 from .classify import WatchEntry
 from .const import DOMAIN
 
@@ -169,8 +170,9 @@ class SkywatchSensor(CoordinatorEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        entry_id = coordinator.config_entry.entry_id  # type: ignore[union-attr]
-        self._attr_unique_id = f"{entry_id}_{description.key}"
+        entry = coordinator.config_entry  # type: ignore[union-attr]
+        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        self._attr_device_info = build_device_info(entry)
 
     @property
     def native_value(self) -> Any:
@@ -207,8 +209,9 @@ class SkywatchFlightsInAreaSensor(CoordinatorEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        entry_id = coordinator.config_entry.entry_id  # type: ignore[union-attr]
-        self._attr_unique_id = f"{entry_id}_{description.key}"
+        entry = coordinator.config_entry  # type: ignore[union-attr]
+        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        self._attr_device_info = build_device_info(entry)
 
     @property
     def native_value(self) -> int:
@@ -230,9 +233,10 @@ class SkywatchWatchSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator: SkywatchCoordinator, watch: WatchEntry) -> None:
         super().__init__(coordinator)
         self._watch = watch
-        entry_id = coordinator.config_entry.entry_id  # type: ignore[union-attr]
-        self._attr_unique_id = f"{entry_id}_watch_{watch.slug}"
+        entry = coordinator.config_entry  # type: ignore[union-attr]
+        self._attr_unique_id = f"{entry.entry_id}_watch_{watch.slug}"
         self._attr_name = watch.label
+        self._attr_device_info = build_device_info(entry)
 
     @property
     def native_value(self) -> int:
