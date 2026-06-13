@@ -252,6 +252,16 @@ class TestWatchAircraft:
         result = query_watch_aircraft(seeded, registration="C-GRPF", tz=REGINA)
         assert result["count"] == 0
 
+    def test_fingerprint_only_match_no_registration(self, seeded: sqlite3.Connection) -> None:
+        # Watch with no registration but only a fingerprint — matches
+        # the Blocked + null-reg + C182 row.
+        result = query_watch_aircraft(seeded, registration="", tz=REGINA, fingerprint_code="C182")
+        assert result["count"] == 1
+
+    def test_empty_reg_and_no_fingerprint_returns_zero(self, seeded: sqlite3.Connection) -> None:
+        result = query_watch_aircraft(seeded, registration="", tz=REGINA)
+        assert result["count"] == 0
+
     def test_relative_time_format(self, seeded: sqlite3.Connection) -> None:
         now = datetime(2026, 6, 13, 12, 30, 0, tzinfo=UTC)  # 30 minutes after base
         result = query_watch_aircraft(seeded, registration="C-FGAR", tz=REGINA, now=now)

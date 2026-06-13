@@ -322,9 +322,10 @@ def query_watch_aircraft(
     """
     reg = (registration or "").strip().upper()
     fp = (fingerprint_code or "").strip().upper()
-    if not reg:
+    if not reg and not fp:
+        # No identifier at all — nothing to match against.
         return {"count": 0, "registration": "", "last_seen": None, "recent": []}
-    if fp:
+    if reg and fp:
         where = (
             "UPPER(IFNULL(registration,'')) = ? "
             "OR (UPPER(IFNULL(aircraft_code,'')) = ? "
@@ -332,6 +333,14 @@ def query_watch_aircraft(
             "    AND registration IS NULL)"
         )
         params: tuple = (reg, fp)
+    elif fp:
+        # Fingerprint-only: the watch tracks a privacy-blocked airframe
+        # whose registration is suppressed at the source. Match purely
+        # on the Blocked-callsign + null-reg + ICAO-code triple.
+        where = (
+            "UPPER(IFNULL(aircraft_code,'')) = ? AND callsign = 'Blocked' AND registration IS NULL"
+        )
+        params = (fp,)
     else:
         where = "UPPER(IFNULL(registration,'')) = ?"
         params = (reg,)
