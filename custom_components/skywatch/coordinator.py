@@ -23,7 +23,8 @@ from zoneinfo import ZoneInfo
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DB_FILENAME, DB_SUBDIR
+from .classify import is_helicopter, is_military, match_watch
+from .const import DB_FILENAME, DB_SUBDIR, EVENT_SKYWATCH_SIGHTING
 from .data_builder import build_data
 from .storage import (
     insert_entry,
@@ -155,16 +156,88 @@ class SkywatchCoordinator(DataUpdateCoordinator):
         )
 
     def _on_entry(self, entry: Entry) -> None:
+        self._fire_skywatch_event(
+            kind="entry",
+            flight_id=entry.flight_id,
+            callsign=entry.callsign,
+            aircraft_code=entry.aircraft_code,
+            aircraft_model=entry.aircraft_model,
+            registration=None,
+        )
         self.hass.async_create_task(self._async_persist_entry(entry))
 
     def _on_exit(self, flight_id: str | None, sighting: Sighting) -> None:
+        self._fire_skywatch_event(
+            kind="exit",
+            flight_id=flight_id,
+            callsign=sighting.callsign,
+            aircraft_code=sighting.aircraft_code,
+            aircraft_model=sighting.aircraft_model,
+            registration=sighting.registration,
+        )
         self.hass.async_create_task(self._async_persist_exit(flight_id, sighting))
 
     def _on_landing(self, movement: Movement) -> None:
+        self._fire_skywatch_event(
+            kind="landed",
+            flight_id=None,
+            callsign=movement.callsign,
+            aircraft_code=movement.aircraft_code,
+            aircraft_model=movement.aircraft_model,
+            registration=movement.registration,
+        )
         self.hass.async_create_task(self._async_persist_movement(movement))
 
     def _on_takeoff(self, movement: Movement) -> None:
+        self._fire_skywatch_event(
+            kind="took_off",
+            flight_id=None,
+            callsign=movement.callsign,
+            aircraft_code=movement.aircraft_code,
+            aircraft_model=movement.aircraft_model,
+            registration=movement.registration,
+        )
         self.hass.async_create_task(self._async_persist_movement(movement))
+
+    def _fire_skywatch_event(
+        self,
+        *,
+        kind: str,
+        flight_id: str | None,
+        callsign: str | None,
+        aircraft_code: str | None,
+        aircraft_model: str | None,
+        registration: str | None,
+    ) -> None:
+        """Fire skywatch_sighting on the HA bus with classification baked in.
+
+        Blueprints listen to this single event instead of FR24-specific
+        events so that swapping the source backend doesn't break the
+        user's automations.
+        """
+        watch = match_watch(
+            {
+                "aircraft_registration": registration,
+                "aircraft_code": aircraft_code,
+                "callsign": callsign,
+            },
+            self._watch_list,
+        )
+        self.hass.bus.async_fire(
+            EVENT_SKYWATCH_SIGHTING,
+            {
+                "kind": kind,
+                "flight_id": flight_id,
+                "callsign": callsign,
+                "aircraft_code": aircraft_code,
+                "aircraft_model": aircraft_model,
+                "registration": registration,
+                "is_helo": is_helicopter(aircraft_code, self._helo_codes),
+                "is_military": is_military(aircraft_code, self._military_codes),
+                "watch_slug": watch.slug if watch else None,
+                "watch_label": watch.label if watch else None,
+            },
+        )
 
     async def _async_persist_entry(self, entry: Entry) -> None:
         if self._conn is None:
