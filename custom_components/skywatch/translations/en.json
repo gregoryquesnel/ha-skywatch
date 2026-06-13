@@ -1,0 +1,41 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Skywatch",
+        "description": "Configure your home location and the aircraft data source.",
+        "data": {
+          "home_latitude": "Home latitude",
+          "home_longitude": "Home longitude",
+          "airport_iata": "Local airport IATA code (e.g. YQR, JFK, LAX)",
+          "radius_km": "Search radius (km)",
+          "source": "Data source"
+        }
+      }
+    },
+    "error": {
+      "fr24_not_loaded": "Flightradar24 integration not found. Install AlexandrErohin/home-assistant-flightradar24 first.",
+      "invalid_latitude": "Latitude must be between -90 and 90.",
+      "invalid_longitude": "Longitude must be between -180 and 180.",
+      "invalid_iata": "Airport IATA must be 3 uppercase letters."
+    },
+    "abort": {
+      "already_configured": "Skywatch is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Skywatch options",
+        "data": {
+          "watch_list": "Watch list (one per line, JSON object)",
+          "helo_codes": "Helicopter ICAO codes",
+          "military_codes": "Military ICAO codes",
+          "alerts_enabled": "Enable entry alerts",
+          "quiet_hours_start": "Quiet hours start",
+          "quiet_hours_end": "Quiet hours end"
+        }
+      }
+    }
+  }
+}
