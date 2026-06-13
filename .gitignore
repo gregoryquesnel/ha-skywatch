@@ -32,5 +32,9 @@ Thumbs.db
 # Local-only golden DB fixture (real user data — never committed)
 tests/fixtures/golden_legacy.db
 
+# Playwright artifacts
+.verify-screenshots/
+scripts/browser/node_modules/
+
 # Local notes
 NOTES.local.md
