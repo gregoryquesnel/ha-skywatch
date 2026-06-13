@@ -6,6 +6,7 @@ the skywatch custom_components/ path inside the test harness, and
 pre-loads http + websocket_api which skywatch declares as dependencies
 in manifest.json (the HA test harness doesn't auto-setup deps).
 """
+
 from __future__ import annotations
 
 import pytest
