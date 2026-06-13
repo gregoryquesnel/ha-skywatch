@@ -1,8 +1,10 @@
 # Minimal test dashboard for Skywatch — deploy via:
 #   mise run deploy:test-dashboard
 #
-# Pure-skywatch dashboard with clear text labels Playwright can assert
-# against. Uses `skywatch_` prefixed entity IDs (v0.1.1+).
+# Renders the data Playwright assertions need to pin. v0.2 adds hour-of-day
+# histogram, top-routes bar chart, rare aircraft, and a sightings table with
+# FlightAware + Wikipedia anchor links — all reading data the sensors already
+# expose in attributes.
 views:
   - title: Skywatch Test
     path: skywatch-test
@@ -68,3 +70,90 @@ views:
             grid_options:
               columns: full
               rows: 8
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Hour-of-day distribution
+            heading_style: title
+          - type: markdown
+            content: |-
+              {%- set _ = now() -%}
+              {%- set buckets = state_attr('sensor.skywatch_sightings_hour_of_day', 'buckets') or [] -%}
+              {%- set max_n = state_attr('sensor.skywatch_sightings_hour_of_day', 'max_n') | int(0) -%}
+              **🕐 Hour-of-day** <span style="opacity:0.6;">(local time, lifetime)</span>
+
+              {% if max_n == 0 -%}
+              _no sightings yet — populates on next 30 min scan._
+              {%- else -%}
+              ```
+              {% for b in buckets -%}
+              {{ '%02d' | format(b.hour) }}h {{ '█' * ((b.n / max_n) * 16) | int }}{{ '░' * (16 - ((b.n / max_n) * 16) | int) }} {{ b.n }}
+              {% endfor -%}
+              ```
+              {%- endif %}
+            grid_options:
+              columns: full
+              rows: auto
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Top routes
+            heading_style: title
+          - type: markdown
+            content: |-
+              {%- set _ = now() -%}
+              {%- set rows = state_attr('sensor.skywatch_top_routes', 'routes') or [] -%}
+              {%- if rows | length == 0 -%}
+              **Top routes** _no routes yet — sensor populates on next 30 min scan._
+              {%- else -%}
+              {%- set max_n = rows[0].n -%}
+              **Top routes** <span style="opacity:0.6;">(lifetime)</span>
+              {% for r in rows[:8] -%}
+              {%- set bar_len = ((r.n / max_n) * 8) | int -%}
+              - `{{ r.origin_iata }}→{{ r.destination_iata }}` {{ '█' * bar_len }}{{ '░' * (8 - bar_len) }} {{ r.n }}
+              {% endfor %}
+              {%- endif -%}
+            grid_options:
+              columns: full
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Rare aircraft
+            heading_style: title
+          - type: markdown
+            content: |
+              **Rare aircraft** <span style="opacity:0.6;">(seen once)</span>
+              {% for a in (state_attr('sensor.skywatch_sightings_all_time','rare_aircraft') or [])[:8] -%}
+              - <a href="https://en.wikipedia.org/wiki/Special:Search?search={{ a.aircraft_model | urlencode }}" target="_blank">{{ a.aircraft_model }}</a>
+              {% endfor %}
+              {% if (state_attr('sensor.skywatch_sightings_all_time','rare_aircraft') or []) | length == 0 -%}
+              _no rare aircraft yet — populates as sightings accumulate._
+              {%- endif %}
+            grid_options:
+              columns: full
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Recent sightings
+            heading_style: title
+          - type: markdown
+            content: |
+              {% set rows = state_attr('sensor.skywatch_recent_sightings','sightings') or [] %}
+              {% set page = state_attr('sensor.skywatch_recent_sightings','page') or 1 %}
+              {% set total_pages = state_attr('sensor.skywatch_recent_sightings','total_pages') or 1 %}
+              {% set total_count = state_attr('sensor.skywatch_recent_sightings','total_count') or 0 %}
+              **Page {{ page }} of {{ total_pages }}** — {{ total_count }} total sightings
+
+              | When (local) | Flight | Aircraft | Route | Alt | Dist | Dwell |
+              |--------------|--------|----------|-------|-----|------|-------|
+              {%- for f in rows[:10] %}
+              {%- set cs = f.callsign or f.flight_number %}
+              | {{ f.exit_time_local or '—' }} | {% if cs %}**<a href="https://flightaware.com/live/flight/{{ cs | urlencode }}" target="_blank">{{ cs }}</a>** {{ f.airline_iata or '' }}{% else %}**?** {{ f.airline_iata or '' }}{% endif %} | {% if f.aircraft_info_url %}<a href="{{ f.aircraft_info_url }}" target="_blank">{{ f.aircraft_code or '?' }}</a>{% else %}{{ f.aircraft_code or '?' }}{% endif %} | {{ f.origin_iata or '—' }}→{{ f.destination_iata or '—' }} | {% if f.altitude_ft %}FL{{ (f.altitude_ft / 100) | int }}{% else %}—{% endif %} | {% if f.closest_km %}{{ f.closest_km | round(1) }} km{% else %}—{% endif %} | {% if f.dwell_seconds %}{% if f.dwell_seconds < 60 %}{{ f.dwell_seconds }}s{% else %}{{ (f.dwell_seconds / 60) | round(0, 'floor') | int }}m{% endif %}{% else %}—{% endif %} |
+              {%- endfor %}
+              {% if not rows %}_no sightings yet — capture is event-driven, first row lands when an aircraft exits the watch radius._{% endif %}
+            grid_options:
+              columns: full
