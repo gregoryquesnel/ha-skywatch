@@ -17,7 +17,8 @@
       "fr24_not_loaded": "Flightradar24 integration not found. Install AlexandrErohin/home-assistant-flightradar24 first.",
       "invalid_latitude": "Latitude must be between -90 and 90.",
       "invalid_longitude": "Longitude must be between -180 and 180.",
-      "invalid_iata": "Airport IATA must be 3 uppercase letters."
+      "invalid_iata": "Airport IATA must be 3 uppercase letters.",
+      "invalid_watch_list": "Each watch list entry must include a 'slug' field."
     },
     "abort": {
       "already_configured": "Skywatch is already configured."
@@ -27,13 +28,13 @@
     "step": {
       "init": {
         "title": "Skywatch options",
+        "description": "Watch list: a list of objects with keys slug (required), label, registration, aircraft_code, match_blocked.",
         "data": {
-          "watch_list": "Watch list (one per line, JSON object)",
+          "watch_list": "Watch list",
           "helo_codes": "Helicopter ICAO codes",
           "military_codes": "Military ICAO codes",
-          "alerts_enabled": "Enable entry alerts",
-          "quiet_hours_start": "Quiet hours start",
-          "quiet_hours_end": "Quiet hours end"
+          "overhead_distance_km": "Overhead distance threshold (km)",
+          "overhead_altitude_ft": "Overhead altitude threshold (ft)"
         }
       }
     }
