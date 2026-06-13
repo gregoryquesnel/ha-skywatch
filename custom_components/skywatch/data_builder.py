@@ -40,6 +40,7 @@ def build_data(
     watch_list: tuple[WatchEntry, ...],
     overhead_distance_km: float = 5.0,
     overhead_altitude_ft: int = 10000,
+    currently_in_area_count: int = 0,
 ) -> dict:
     """Build the coordinator's data dict for a single refresh tick.
 
@@ -60,8 +61,16 @@ def build_data(
         "top_routes": query_top_routes(conn),
         "hour_histogram": query_hour_histogram(conn, tz),
         "movements_today": query_movements_today(conn, tz),
-        "active_1h": query_active_1h(conn),
-        "active_24h": query_active_24h(conn),
+        # 'active in last N hours' = completed transits in window + aircraft
+        # currently in area. The two sets are disjoint (a flight that's
+        # currently in area hasn't generated a sighting row yet), so the
+        # sum is the distinct count of aircraft with area presence during
+        # the window. Without the currently-in-area term, a plane that
+        # entered 30 min ago and is still visible doesn't get counted —
+        # which is the bug the user hit ('active last 1h = 0' even though
+        # multiple planes were obviously in view).
+        "active_1h": {"count": query_active_1h(conn)["count"] + currently_in_area_count},
+        "active_24h": {"count": query_active_24h(conn)["count"] + currently_in_area_count},
     }
     if current_search:
         data["search"] = query_search(conn, current_search, tz)
