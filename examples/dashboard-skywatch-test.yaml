@@ -49,6 +49,22 @@ views:
       - type: grid
         cards:
           - type: heading
+            heading: Sky Pulse
+            heading_style: title
+          - type: tile
+            entity: sensor.skywatch_active_last_1h
+            name: Active last 1h
+            icon: mdi:clock-outline
+            color: lime
+          - type: tile
+            entity: sensor.skywatch_active_last_24h
+            name: Active last 24h
+            icon: mdi:clock-time-eight-outline
+            color: lime
+
+      - type: grid
+        cards:
+          - type: heading
             heading: Skywatch state
             heading_style: title
           - type: tile
@@ -148,11 +164,19 @@ views:
               {% set total_count = state_attr('sensor.skywatch_recent_sightings','total_count') or 0 %}
               **Page {{ page }} of {{ total_pages }}** — {{ total_count }} total sightings
 
-              | When (local) | Flight | Aircraft | Route | Alt | Dist | Dwell |
-              |--------------|--------|----------|-------|-----|------|-------|
+              | When (local) | ✈ | Flight | Aircraft | Route | Alt | Dist | Dwell |
+              |--------------|---|--------|----------|-------|-----|------|-------|
               {%- for f in rows[:10] %}
               {%- set cs = f.callsign or f.flight_number %}
-              | {{ f.exit_time_local or '—' }} | {% if cs %}**<a href="https://flightaware.com/live/flight/{{ cs | urlencode }}" target="_blank">{{ cs }}</a>** {{ f.airline_iata or '' }}{% else %}**?** {{ f.airline_iata or '' }}{% endif %} | {% if f.aircraft_info_url %}<a href="{{ f.aircraft_info_url }}" target="_blank">{{ f.aircraft_code or '?' }}</a>{% else %}{{ f.aircraft_code or '?' }}{% endif %} | {{ f.origin_iata or '—' }}→{{ f.destination_iata or '—' }} | {% if f.altitude_ft %}FL{{ (f.altitude_ft / 100) | int }}{% else %}—{% endif %} | {% if f.closest_km %}{{ f.closest_km | round(1) }} km{% else %}—{% endif %} | {% if f.dwell_seconds %}{% if f.dwell_seconds < 60 %}{{ f.dwell_seconds }}s{% else %}{{ (f.dwell_seconds / 60) | round(0, 'floor') | int }}m{% endif %}{% else %}—{% endif %} |
+              {%- set photo = f.aircraft_photo or '' %}
+              {#- JetPhotos thumbnail (/200/.../_tb.jpg) → full-resolution
+                  JPG (/full/.../.jpg). Verified empirically; non-JetPhotos
+                  URLs fall through unchanged. Storage layer's
+                  normalize_photo_url has already stripped the legacy
+                  'https:https://' doubled-prefix bug at insert time, so
+                  we only need the size transformation here. -#}
+              {%- set photo_full = photo | replace('/200/', '/full/') | replace('_tb.jpg', '.jpg') if 'cdn.jetphotos.com/200/' in photo else photo %}
+              | {{ f.exit_time_local or '—' }} | {% if photo %}<a href="{{ photo_full }}" target="_blank"><img src="{{ photo }}" width="160"></a>{% endif %} | {% if cs %}**<a href="https://flightaware.com/live/flight/{{ cs | urlencode }}" target="_blank">{{ cs }}</a>** {{ f.airline_iata or '' }}{% else %}**?** {{ f.airline_iata or '' }}{% endif %} | {% if f.aircraft_info_url %}<a href="{{ f.aircraft_info_url }}" target="_blank">{{ f.aircraft_code or '?' }}</a>{% else %}{{ f.aircraft_code or '?' }}{% endif %} | {{ f.origin_iata or '—' }}→{{ f.destination_iata or '—' }} | {% if f.altitude_ft %}FL{{ (f.altitude_ft / 100) | int }}{% else %}—{% endif %} | {% if f.closest_km %}{{ f.closest_km | round(1) }} km{% else %}—{% endif %} | {% if f.dwell_seconds %}{% if f.dwell_seconds < 60 %}{{ f.dwell_seconds }}s{% else %}{{ (f.dwell_seconds / 60) | round(0, 'floor') | int }}m{% endif %}{% else %}—{% endif %} |
               {%- endfor %}
               {% if not rows %}_no sightings yet — capture is event-driven, first row lands when an aircraft exits the watch radius._{% endif %}
             grid_options:

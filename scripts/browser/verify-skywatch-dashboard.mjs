@@ -53,6 +53,10 @@ const EXPECTED_TEXTS = [
   'Top routes',
   'Rare aircraft',
   'Recent sightings',
+  // v0.2 Tier 2 — new active sensors + Sky Pulse section
+  'Sky Pulse',
+  'Active last 1h',
+  'Active last 24h',
 ];
 
 const FORBIDDEN_TEXTS = [

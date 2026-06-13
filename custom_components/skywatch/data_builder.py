@@ -15,6 +15,8 @@ from zoneinfo import ZoneInfo
 
 from .classify import WatchEntry
 from .storage import (
+    query_active_1h,
+    query_active_24h,
     query_hour_histogram,
     query_military,
     query_movements_today,
@@ -58,6 +60,8 @@ def build_data(
         "top_routes": query_top_routes(conn),
         "hour_histogram": query_hour_histogram(conn, tz),
         "movements_today": query_movements_today(conn, tz),
+        "active_1h": query_active_1h(conn),
+        "active_24h": query_active_24h(conn),
     }
     if current_search:
         data["search"] = query_search(conn, current_search, tz)

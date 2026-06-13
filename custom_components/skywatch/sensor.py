@@ -61,6 +61,20 @@ SENSORS: tuple[SkywatchSensorDescription, ...] = (
         value_fn=lambda d: d.get("stats", {}).get("this_week", 0),
     ),
     SkywatchSensorDescription(
+        key="active_last_1h",
+        translation_key="active_last_1h",
+        name="Active last 1h",
+        icon="mdi:clock-outline",
+        value_fn=lambda d: d.get("active_1h", {}).get("count", 0),
+    ),
+    SkywatchSensorDescription(
+        key="active_last_24h",
+        translation_key="active_last_24h",
+        name="Active last 24h",
+        icon="mdi:clock-time-eight-outline",
+        value_fn=lambda d: d.get("active_24h", {}).get("count", 0),
+    ),
+    SkywatchSensorDescription(
         key="log_recent",
         translation_key="log_recent",
         name="Recent sightings",
