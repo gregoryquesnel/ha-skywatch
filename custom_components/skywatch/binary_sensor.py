@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._device import build_device_info
 from .classify import is_helicopter
 from .const import DOMAIN
 
@@ -50,8 +51,9 @@ class SkywatchHasAircraftBinarySensor(CoordinatorEntity, BinarySensorEntity):
 
     def __init__(self, coordinator: SkywatchCoordinator) -> None:
         super().__init__(coordinator)
-        entry_id = coordinator.config_entry.entry_id  # type: ignore[union-attr]
-        self._attr_unique_id = f"{entry_id}_has_aircraft"
+        entry = coordinator.config_entry  # type: ignore[union-attr]
+        self._attr_unique_id = f"{entry.entry_id}_has_aircraft"
+        self._attr_device_info = build_device_info(entry)
 
     @property
     def is_on(self) -> bool:
@@ -66,8 +68,9 @@ class SkywatchHelicopterOverheadBinarySensor(CoordinatorEntity, BinarySensorEnti
 
     def __init__(self, coordinator: SkywatchCoordinator) -> None:
         super().__init__(coordinator)
-        entry_id = coordinator.config_entry.entry_id  # type: ignore[union-attr]
-        self._attr_unique_id = f"{entry_id}_helicopter_overhead"
+        entry = coordinator.config_entry  # type: ignore[union-attr]
+        self._attr_unique_id = f"{entry.entry_id}_helicopter_overhead"
+        self._attr_device_info = build_device_info(entry)
 
     @property
     def is_on(self) -> bool:
