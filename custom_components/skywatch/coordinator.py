@@ -37,6 +37,7 @@ from .storage import (
 if TYPE_CHECKING:
     import sqlite3
 
+    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
     from .backends import Source
@@ -54,9 +55,11 @@ class SkywatchCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
+        config_entry: ConfigEntry,
         source: Source,
         *,
         tz: ZoneInfo,
+        helo_codes: tuple[str, ...],
         military_codes: tuple[str, ...],
         watch_list: tuple[WatchEntry, ...],
         overhead_distance_km: float = 5.0,
@@ -65,11 +68,13 @@ class SkywatchCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name="skywatch",
             update_interval=UPDATE_INTERVAL,
         )
         self._source = source
         self._tz = tz
+        self._helo_codes = helo_codes
         self._military_codes = military_codes
         self._watch_list = watch_list
         self._overhead_distance_km = overhead_distance_km
@@ -86,6 +91,10 @@ class SkywatchCoordinator(DataUpdateCoordinator):
     @property
     def watch_list(self) -> tuple[WatchEntry, ...]:
         return self._watch_list
+
+    @property
+    def helo_codes(self) -> tuple[str, ...]:
+        return self._helo_codes
 
     async def async_setup(self) -> None:
         db_path = Path(self.hass.config.path(DB_SUBDIR)) / DB_FILENAME
