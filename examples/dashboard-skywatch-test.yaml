@@ -185,6 +185,43 @@ views:
       - type: grid
         cards:
           - type: heading
+            heading: Sightings controls
+            heading_style: title
+          - type: button
+            name: Prev
+            icon: mdi:chevron-left
+            tap_action:
+              action: call-service
+              service: skywatch.set_page
+              data:
+                page: "{{ [(state_attr('sensor.skywatch_recent_sightings', 'page') or 1) - 1, 1] | max }}"
+            grid_options:
+              columns: 4
+              rows: 1
+          - type: markdown
+            content: |
+              <div style="text-align:center;font-size:1.1em;padding-top:0.5em;">
+              <strong>Page {{ state_attr('sensor.skywatch_recent_sightings', 'page') or 1 }}</strong>
+              of {{ state_attr('sensor.skywatch_recent_sightings', 'total_pages') or 1 }}
+              </div>
+            grid_options:
+              columns: 4
+              rows: 1
+          - type: button
+            name: Next
+            icon: mdi:chevron-right
+            tap_action:
+              action: call-service
+              service: skywatch.set_page
+              data:
+                page: "{{ [(state_attr('sensor.skywatch_recent_sightings', 'page') or 1) + 1, state_attr('sensor.skywatch_recent_sightings', 'total_pages') or 1] | min }}"
+            grid_options:
+              columns: 4
+              rows: 1
+
+      - type: grid
+        cards:
+          - type: heading
             heading: Recent sightings
             heading_style: title
           - type: markdown
