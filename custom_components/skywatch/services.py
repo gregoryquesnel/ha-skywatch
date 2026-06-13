@@ -27,12 +27,22 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 SERVICE_IMPORT_LEGACY_DB = "import_legacy_db"
+SERVICE_SET_PAGE = "set_page"
+SERVICE_SET_SEARCH_TERM = "set_search_term"
 
 IMPORT_SERVICE_SCHEMA = vol.Schema(
     {
         vol.Optional("source_path", default="/config/sky_sightings.db"): cv.string,
     }
 )
+
+SET_PAGE_SCHEMA = vol.Schema(
+    {
+        vol.Required("page"): vol.All(vol.Coerce(int), vol.Range(min=1)),
+    }
+)
+
+SET_SEARCH_TERM_SCHEMA = vol.Schema({vol.Required("term"): cv.string})
 
 
 async def async_register_services(hass: HomeAssistant) -> None:
@@ -70,13 +80,39 @@ async def async_register_services(hass: HomeAssistant) -> None:
             lambda: sentinel.write_text(f"imported from {source_path}\n")
         )
 
+    async def _handle_set_page(call: ServiceCall) -> None:
+        page = int(call.data["page"])
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            coordinator = hass.data[DOMAIN].get(entry.entry_id)
+            if coordinator is not None:
+                await coordinator.async_set_page(page)
+
+    async def _handle_set_search_term(call: ServiceCall) -> None:
+        term = str(call.data["term"])
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            coordinator = hass.data[DOMAIN].get(entry.entry_id)
+            if coordinator is not None:
+                await coordinator.async_set_search_term(term)
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_IMPORT_LEGACY_DB,
         _handle_import_legacy,
         schema=IMPORT_SERVICE_SCHEMA,
     )
+    hass.services.async_register(DOMAIN, SERVICE_SET_PAGE, _handle_set_page, schema=SET_PAGE_SCHEMA)
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_SEARCH_TERM,
+        _handle_set_search_term,
+        schema=SET_SEARCH_TERM_SCHEMA,
+    )
 
 
 def async_unregister_services(hass: HomeAssistant) -> None:
-    hass.services.async_remove(DOMAIN, SERVICE_IMPORT_LEGACY_DB)
+    for name in (
+        SERVICE_IMPORT_LEGACY_DB,
+        SERVICE_SET_PAGE,
+        SERVICE_SET_SEARCH_TERM,
+    ):
+        hass.services.async_remove(DOMAIN, name)

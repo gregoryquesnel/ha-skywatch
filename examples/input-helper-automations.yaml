@@ -1,0 +1,26 @@
+# Sample input-helper automations for the Skywatch dashboard template.
+#
+# These wire the user-created input_number.skywatch_log_page +
+# input_text.skywatch_log_search_term to the integration's set_page /
+# set_search_term services.
+#
+# Add to your config/automations.yaml (or via UI) after creating the
+# input helpers under Settings → Devices & Services → Helpers.
+
+- alias: Skywatch — refresh recent on page change
+  trigger:
+    - platform: state
+      entity_id: input_number.skywatch_log_page
+  action:
+    - service: skywatch.set_page
+      data:
+        page: '{{ states("input_number.skywatch_log_page") | int(1) }}'
+
+- alias: Skywatch — refresh search on term change
+  trigger:
+    - platform: state
+      entity_id: input_text.skywatch_log_search_term
+  action:
+    - service: skywatch.set_search_term
+      data:
+        term: '{{ states("input_text.skywatch_log_search_term") | string }}'
