@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
@@ -101,6 +101,29 @@ def query_today(conn: sqlite3.Connection, tz: ZoneInfo, now: datetime | None = N
         conn.execute("SELECT COUNT(*) FROM sightings WHERE exit_time >= ?", (cutoff,)).fetchone()[0]
     )
     return {"count": count}
+
+
+def _count_since(conn: sqlite3.Connection, anchor: datetime, hours: int) -> int:
+    cutoff = (anchor - timedelta(hours=hours)).astimezone(UTC).isoformat(timespec="seconds")
+    return int(
+        conn.execute("SELECT COUNT(*) FROM sightings WHERE exit_time >= ?", (cutoff,)).fetchone()[0]
+    )
+
+
+def query_active_1h(conn: sqlite3.Connection, now: datetime | None = None) -> dict:
+    """Count of sightings completed in the last 1 hour (rolling window).
+
+    The Sky Pulse section's high-frequency activity tile — answers "how
+    busy was the last hour?" independent of local-midnight cutoff.
+    """
+    anchor = now or datetime.now(UTC)
+    return {"count": _count_since(conn, anchor, 1)}
+
+
+def query_active_24h(conn: sqlite3.Connection, now: datetime | None = None) -> dict:
+    """Count of sightings completed in the last 24 hours (rolling window)."""
+    anchor = now or datetime.now(UTC)
+    return {"count": _count_since(conn, anchor, 24)}
 
 
 def query_search(

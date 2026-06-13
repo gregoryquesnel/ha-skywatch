@@ -9,6 +9,8 @@ from .connection import open_db
 from .migrations import run_migrations
 from .normalizers import coerce_float, coerce_int, normalize_photo_url, parse_iso
 from .queries import (
+    query_active_1h,
+    query_active_24h,
     query_hour_histogram,
     query_military,
     query_movements_today,
@@ -40,6 +42,8 @@ __all__ = [
     "open_db",
     "parse_iso",
     "prune_stale_entries",
+    "query_active_1h",
+    "query_active_24h",
     "query_hour_histogram",
     "query_military",
     "query_movements_today",
