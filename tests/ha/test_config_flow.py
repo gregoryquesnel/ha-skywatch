@@ -26,6 +26,7 @@ Drop the xfail decorators after one of:
   3. Adopting HACS's own integration_test pattern (uses a stripped-down
      hass fixture).
 """
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -85,9 +86,7 @@ async def test_missing_fr24_blocks_submission(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], VALID_USER_INPUT
-    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], VALID_USER_INPUT)
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["errors"] == {"base": "fr24_not_loaded"}
 
@@ -100,9 +99,7 @@ async def test_happy_path_with_fr24_present(
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], VALID_USER_INPUT
-        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], VALID_USER_INPUT)
 
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     assert result["title"] == "Skywatch"
