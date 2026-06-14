@@ -13,9 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # hassfest@master auto-discovers integrations under
+      # custom_components/. The 'path' input from older docs was
+      # removed and now triggers 'Unexpected input(s)' failures.
       - uses: home-assistant/actions/hassfest@master
-        with:
-          path: custom_components/skywatch
 
   hacs:
     name: HACS
