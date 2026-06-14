@@ -9,7 +9,7 @@ blueprint:
     Pairs with the watch list edited via the Skywatch integration's
     options flow (each entry has a slug + label + match criteria).
   domain: automation
-  source_url: https://github.com/TBD/ha-skywatch/blob/main/blueprints/automation/skywatch/watch-list-match-alert.yaml
+  source_url: https://github.com/gregoryquesnel/ha-skywatch/blob/main/blueprints/automation/skywatch/watch-list-match-alert.yaml
   input:
     watch_slug:
       name: Watch slug (optional)
