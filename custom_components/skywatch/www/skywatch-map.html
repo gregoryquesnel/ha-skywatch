@@ -88,6 +88,27 @@
     }
     #legend .ico svg { width: 14px; height: 14px; }
 
+    /* Recenter button — sits below the zoom controls */
+    .leaflet-control.skywatch-recenter {
+      background: rgba(11,14,19,0.85);
+      color: #4fc3f7;
+      border: 1px solid rgba(79,195,247,0.4);
+      border-radius: 4px;
+      width: 30px;
+      height: 30px;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .leaflet-control.skywatch-recenter:hover {
+      background: rgba(79,195,247,0.15);
+      border-color: #4fc3f7;
+    }
+
     /* Status badge */
     #status {
       position: absolute;
@@ -276,6 +297,23 @@
       // never touch pan/zoom, so the user's interactive viewport is
       // preserved as they explore.
       map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+
+      // Recenter-on-home button — clicking restores the initial
+      // AOI-fit view without reloading the page. Sits in the
+      // topleft control bar under Leaflet's zoom controls.
+      const RecenterControl = L.Control.extend({
+        onAdd: () => {
+          const btn = L.DomUtil.create("button", "leaflet-bar leaflet-control skywatch-recenter");
+          btn.title = "Recenter on home";
+          btn.innerHTML = "🏠";
+          L.DomEvent.disableClickPropagation(btn);
+          btn.onclick = () => {
+            map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+          };
+          return btn;
+        },
+      });
+      new RecenterControl({ position: "topleft" }).addTo(map);
 
       // Populate legend silhouettes
       for (const [cat, svg] of Object.entries(CATEGORY_SVG)) {
