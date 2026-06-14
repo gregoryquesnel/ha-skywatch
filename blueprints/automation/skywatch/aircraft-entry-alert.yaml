@@ -10,7 +10,7 @@ blueprint:
     helicopter-only flag (`is_helo`). The integration's helo_codes
     config drives the boolean — no list duplication here.
   domain: automation
-  source_url: https://github.com/TBD/ha-skywatch/blob/main/blueprints/automation/skywatch/aircraft-entry-alert.yaml
+  source_url: https://github.com/gregoryquesnel/ha-skywatch/blob/main/blueprints/automation/skywatch/aircraft-entry-alert.yaml
   input:
     enable_toggle:
       name: Enable toggle (optional)

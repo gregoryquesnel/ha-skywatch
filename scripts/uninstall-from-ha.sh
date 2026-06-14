@@ -40,11 +40,8 @@ Press Ctrl+C now to abort, or Enter to continue.
 EOF
 read -r
 
-echo "==> Removing /config/custom_components/skywatch"
+echo "==> Removing /config/custom_components/skywatch (incl. bundled www/)"
 $SSH "sudo rm -rf /config/custom_components/skywatch"
-
-echo "==> Removing /config/www/skywatch-map.html"
-$SSH "sudo rm -f /config/www/skywatch-map.html"
 
 echo "==> /config/skywatch/sightings.db (sighting history) is preserved."
 echo "    Remove manually with:  $SSH 'sudo rm -rf /config/skywatch'"

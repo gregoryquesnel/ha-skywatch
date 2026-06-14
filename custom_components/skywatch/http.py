@@ -11,11 +11,11 @@ Two HomeAssistantViews register on integration setup:
     Returns the Leaflet map HTML page. The page polls
     /api/skywatch/flights.geojson every 5 s and renders markers.
 
-The map HTML is served from www/skywatch-map.html via
-register_static_path. No CDN dependencies are baked into the page in
-v0.1 — Leaflet 1.9.4 is loaded from unpkg by default. Self-hosters can
-swap the script + stylesheet URLs by editing www/skywatch-map.html
-directly.
+The map HTML is served from custom_components/skywatch/www/skywatch-map.html
+(inside the package so HACS distributes it). No CDN dependencies are
+baked into the page; Leaflet 1.9.4 loads from unpkg by default.
+Self-hosters can swap the script + stylesheet URLs by editing the
+HTML directly.
 """
 
 from __future__ import annotations
@@ -145,11 +145,16 @@ class SkywatchFlightsGeoJSONView(HomeAssistantView):
 
 
 class SkywatchMapView(HomeAssistantView):
-    """Static Leaflet page — served from www/skywatch-map.html.
+    """Static Leaflet page — served from custom_components/skywatch/www/skywatch-map.html.
 
     requires_auth=False so the page renders inside Lovelace iframes
     (which don't forward HA's auth cookie). The HTML is static and
     doesn't expose any state.
+
+    Path: the HTML ships INSIDE the custom_components/skywatch/
+    package so HACS distributes it alongside the Python code. A path
+    of <repo_root>/www/<file> would not work for HACS users because
+    HACS only mirrors the integration directory.
     """
 
     url = "/api/skywatch/map"
@@ -158,7 +163,7 @@ class SkywatchMapView(HomeAssistantView):
 
     def __init__(self, hass: HomeAssistant) -> None:
         self._hass = hass
-        self._html_path = Path(__file__).parent.parent.parent / "www" / "skywatch-map.html"
+        self._html_path = Path(__file__).parent / "www" / "skywatch-map.html"
 
     async def get(self, request: Request) -> Response:
         from aiohttp.web import Response as WebResponse  # noqa: PLC0415

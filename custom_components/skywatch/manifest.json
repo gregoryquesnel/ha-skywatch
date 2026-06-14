@@ -2,13 +2,13 @@
   "domain": "skywatch",
   "name": "Skywatch",
   "after_dependencies": ["flightradar24"],
-  "codeowners": ["@TBD"],
+  "codeowners": ["@gregoryquesnel"],
   "config_flow": true,
   "dependencies": ["http", "websocket_api"],
-  "documentation": "https://github.com/TBD/ha-skywatch",
+  "documentation": "https://github.com/gregoryquesnel/ha-skywatch",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/TBD/ha-skywatch/issues",
+  "issue_tracker": "https://github.com/gregoryquesnel/ha-skywatch/issues",
   "requirements": [],
-  "version": "0.0.1"
+  "version": "0.2.0"
 }

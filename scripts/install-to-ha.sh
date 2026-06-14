@@ -50,20 +50,16 @@ if $DRY_RUN; then
   exit 0
 fi
 
-echo "==> Ensuring /config/custom_components and /config/www exist"
-$SSH "sudo mkdir -p /config/custom_components /config/www && sudo chown -R ${HA_SSH_USER}:${HA_SSH_USER} /config/custom_components /config/www"
+echo "==> Ensuring /config/custom_components exists"
+$SSH "sudo mkdir -p /config/custom_components && sudo chown -R ${HA_SSH_USER}:${HA_SSH_USER} /config/custom_components"
 
-echo "==> Syncing custom_components/skywatch/"
+echo "==> Syncing custom_components/skywatch/ (includes www/skywatch-map.html)"
 rsync -av --delete \
   -e "ssh -p ${HA_SSH_PORT}" \
   --exclude='__pycache__' \
   --exclude='*.pyc' \
   "${REPO_ROOT}/custom_components/skywatch/" \
   "${HA_SSH_USER}@${HA_HOST}:/config/custom_components/skywatch/"
-
-echo "==> Copying www/skywatch-map.html"
-scp -P "${HA_SSH_PORT}" "${REPO_ROOT}/www/skywatch-map.html" \
-  "${HA_SSH_USER}@${HA_HOST}:/config/www/skywatch-map.html"
 
 if $RESTART; then
   echo "==> Restarting HA"

@@ -36,5 +36,8 @@ tests/fixtures/golden_legacy.db
 .verify-screenshots/
 scripts/browser/node_modules/
 
+# Generated pycache inside the bundled package
+custom_components/skywatch/www/__pycache__/
+
 # Local notes
 NOTES.local.md
