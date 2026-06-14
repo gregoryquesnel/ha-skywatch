@@ -6,6 +6,8 @@ Home Assistant integration that captures, persists, and surfaces aircraft sighti
 
 ![Dashboard screenshot](docs/screenshots/dashboard.png)
 
+![Live map with silhouettes and trails](docs/screenshots/live-map.png)
+
 ## What you get
 
 - **13 entities** — sightings today / this week / all-time / overhead / military / movements / 1h / 24h activity / search results / hour-of-day histogram / top routes, plus `aircraft_present` and `helicopter_overhead` binary sensors
