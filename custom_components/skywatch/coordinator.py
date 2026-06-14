@@ -21,7 +21,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .classify import is_helicopter, is_military, match_watch
@@ -120,13 +123,24 @@ class SkywatchCoordinator(DataUpdateCoordinator):
             self._source.on_landing(self._on_landing),
             self._source.on_takeoff(self._on_takeoff),
         ]
-        # Fast trail-capture loop: every 5 s sample every in-area flight's
-        # lat/lon into flight_positions, then prune anything > 30 min old.
-        # Independent of the 30 s data refresh — trails need finer
-        # resolution.
-        self._unsub_trail_capture = async_track_time_interval(
-            self.hass, self._capture_positions, TRAIL_CAPTURE_INTERVAL
-        )
+        # Trail capture: prefer event-driven (subscribe to the source's
+        # state-bearing sensors) so we capture exactly once per FR24
+        # poll instead of running 3 redundant 5-second ticks per 15s
+        # FR24 cycle. Falls back to time-interval ticks if the source
+        # has no watched_entities (e.g. event-only backends like a
+        # future dump1090 adapter).
+        watched = self._source.watched_entities()
+        if watched:
+            self._unsub_trail_capture = async_track_state_change_event(
+                self.hass, watched, self._capture_positions
+            )
+            # Capture once at startup — won't have a state-change event
+            # for FR24's existing state until it next polls.
+            self.hass.async_create_task(self._capture_positions())
+        else:
+            self._unsub_trail_capture = async_track_time_interval(
+                self.hass, self._capture_positions, TRAIL_CAPTURE_INTERVAL
+            )
         await self.async_config_entry_first_refresh()
 
     async def async_unload(self) -> None:
@@ -147,12 +161,17 @@ class SkywatchCoordinator(DataUpdateCoordinator):
             return {}
         return await self.hass.async_add_executor_job(fetch_trails, self._conn, flight_ids)
 
-    async def _capture_positions(self, _now=None) -> None:
-        """Trail capture tick — sample positions + persist + prune.
+    async def _capture_positions(self, *_args) -> None:
+        """Trail capture — sample positions, persist, prune.
 
-        Async so async_track_time_interval awaits the persistence
-        directly. Earlier sync + async_create_task pattern dropped the
-        coroutine on the floor in HA 2026 (RuntimeWarning: never awaited).
+        Signature accepts either a fire-at-time arg (from
+        async_track_time_interval) or a state-changed event (from
+        async_track_state_change_event); both are ignored, the function
+        always reads source.current_flights() fresh.
+
+        Async so the scheduling layer awaits the persistence directly.
+        Earlier sync + async_create_task pattern dropped the coroutine
+        on the floor in HA 2026 (RuntimeWarning: never awaited).
         """
         if self._conn is None:
             return

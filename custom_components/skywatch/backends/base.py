@@ -64,6 +64,20 @@ class Source(ABC):
         """
         return []
 
+    def watched_entities(self) -> list[str]:
+        """HA entity IDs whose state changes signal new source data.
+
+        Coordinator subscribes via async_track_state_change_event on
+        these — every change triggers an immediate position capture
+        instead of waiting for a periodic tick. Halves end-to-end
+        latency from 'source has new data' to 'marker moves on map.'
+
+        Default empty list — backends that don't have a state sensor
+        to watch (e.g. an event-only adapter) get the coordinator's
+        fallback time-interval tick.
+        """
+        return []
+
     def on_entry(self, callback: EntryListener) -> Callable[[], None]:
         return self._register(self._entry_listeners, callback)
 

@@ -91,6 +91,10 @@ class Fr24Source(Source):
         flights = state.attributes.get("flights")
         return list(flights) if isinstance(flights, list) else []
 
+    def watched_entities(self) -> list[str]:
+        """FR24's `current_in_area` sensor — every state change is a new poll."""
+        return [FR24_LIVE_SENSOR]
+
     def _handle_entry(self, event: Event) -> None:
         entry = self._payload_to_entry(event.data)
         if entry is not None:
