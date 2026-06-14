@@ -4,6 +4,8 @@ Home Assistant integration that captures, persists, and surfaces aircraft sighti
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
+> **Repo layout**: This GitHub repo is the public mirror. Source-of-truth is on a private GitLab; commits push-mirror here every ~5 min. Contributions accepted on either side — see [CONTRIBUTING.md](CONTRIBUTING.md) for the flow.
+
 ![Dashboard screenshot](docs/screenshots/dashboard.png)
 
 ![Live map with silhouettes and trails](docs/screenshots/live-map.png)

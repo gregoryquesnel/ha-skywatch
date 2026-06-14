@@ -1,0 +1,61 @@
+stages:
+  - validate
+  - release
+
+variables:
+  # Pin the Debian variant per parent-repo memory: rolling `python:3.12-slim`
+  # re-pointed Bookworm -> Trixie post-release and apt mirrors stalled. Pin
+  # the variant suffix.
+  PYTHON_IMAGE: "python:3.12-slim-bookworm"
+  GH_VERSION: "2.62.0"
+
+ruff:
+  stage: validate
+  image: $PYTHON_IMAGE
+  before_script:
+    - pip install --quiet ruff
+  script:
+    - ruff check custom_components tests
+    - ruff format --check custom_components tests
+
+pytest:
+  stage: validate
+  image: $PYTHON_IMAGE
+  before_script:
+    - pip install --quiet pytest pytest-asyncio
+  script:
+    - pytest tests/unit -v
+
+# Hassfest + HACS validation are NOT replicated here.
+# They run on the GitHub mirror via .github/workflows/validate.yml on every
+# push (the push-mirror config in Settings -> Repository -> Mirroring sends
+# commits from this GitLab project to github.com/gregoryquesnel/ha-skywatch
+# automatically). Hassfest + HACS are Docker actions; running them on GitLab
+# would require docker-in-docker. Belt-and-suspenders via the mirror is the
+# lighter path.
+
+github-release:
+  stage: release
+  image: $PYTHON_IMAGE
+  rules:
+    - if: $CI_COMMIT_TAG
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl git ca-certificates
+    - curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -o /tmp/gh.tar.gz
+    - tar -xzf /tmp/gh.tar.gz -C /tmp
+    - mv /tmp/gh_${GH_VERSION}_linux_amd64/bin/gh /usr/local/bin/
+    - gh --version
+  script:
+    # Push the tag to GitHub explicitly so the release can be cut against it.
+    # We don't rely on the push-mirror cycle here because mirror timing is
+    # ~5 min and we want the release published immediately after the tag job.
+    - git remote add github "https://x-access-token:${GITHUB_TOKEN}@github.com/gregoryquesnel/ha-skywatch.git"
+    - git push github "$CI_COMMIT_TAG"
+    # Create the GitHub release. HACS surfaces GitHub releases to users in
+    # the store; the bare tag alone shows up but without release notes.
+    - echo "$GITHUB_TOKEN" | gh auth login --with-token
+    - |
+      gh release create "$CI_COMMIT_TAG" \
+        --repo gregoryquesnel/ha-skywatch \
+        --title "$CI_COMMIT_TAG" \
+        --notes "Released via GitLab CI from pipeline $CI_PIPELINE_URL. See [CHANGELOG.md](https://github.com/gregoryquesnel/ha-skywatch/blob/main/CHANGELOG.md) for details."
