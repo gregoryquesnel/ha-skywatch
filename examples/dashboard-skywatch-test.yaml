@@ -1,10 +1,6 @@
-# Minimal test dashboard for Skywatch — deploy via:
+# Skywatch test dashboard. Map is the hero (top, full width, tall);
+# everything else lives below. Deploy via:
 #   mise run deploy:test-dashboard
-#
-# Renders the data Playwright assertions need to pin. v0.2 adds hour-of-day
-# histogram, top-routes bar chart, rare aircraft, and a sightings table with
-# FlightAware + Wikipedia anchor links — all reading data the sensors already
-# expose in attributes.
 views:
   - title: Skywatch Test
     path: skywatch-test
@@ -12,6 +8,19 @@ views:
     type: sections
     max_columns: 3
     sections:
+      # === HERO: live map spans the full width and is tall enough to read ===
+      - type: grid
+        column_span: 3
+        cards:
+          - type: heading
+            heading: Live map
+            heading_style: title
+          - type: iframe
+            url: /api/skywatch/map
+            grid_options:
+              columns: full
+              rows: 14
+
       - type: grid
         cards:
           - type: heading
@@ -75,17 +84,6 @@ views:
             entity: binary_sensor.skywatch_helicopter_overhead
             name: Helicopter overhead
             icon: mdi:helicopter
-
-      - type: grid
-        cards:
-          - type: heading
-            heading: Live map
-            heading_style: title
-          - type: iframe
-            url: /api/skywatch/map
-            grid_options:
-              columns: full
-              rows: 8
 
       - type: grid
         cards:

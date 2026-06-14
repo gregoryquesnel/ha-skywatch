@@ -269,6 +269,14 @@
         }).addTo(map);
       }
 
+      // Initial viewport: fit the entire AOI circle in view with a
+      // small padding so edge aircraft markers don't get clipped.
+      // Replaces the placeholder zoom 10 from setView() above.
+      // This runs once (first ensureMap call) — subsequent ticks
+      // never touch pan/zoom, so the user's interactive viewport is
+      // preserved as they explore.
+      map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+
       // Populate legend silhouettes
       for (const [cat, svg] of Object.entries(CATEGORY_SVG)) {
         const slug = cat.replace(/_/g, "-");
