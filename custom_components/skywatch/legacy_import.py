@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import sqlite3
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -276,7 +277,7 @@ def _source_expr(column: str) -> str:
     return f"l.{column}"
 
 
-def _window_statements(
+def _window_plan(
     conn: sqlite3.Connection,
     *,
     source_alias: str,
@@ -287,8 +288,18 @@ def _window_statements(
     since: str | None,
     until: str | None,
     tolerance_seconds: int,
-) -> tuple[str, str, str, tuple[str, ...]]:
-    """Build (candidates_sql, new_rows_sql, insert_sql, params) for one table."""
+) -> dict:
+    """Build the SQL for one table's windowed, de-duplicated copy.
+
+    Returns a dict with:
+      candidates_sql — COUNT of legacy rows inside the window
+      new_rows_sql   — the mapped legacy rows not yet in the target
+      stage_table    — name of the TEMP table new rows are staged into
+      commit_sql     — INSERT from the stage table into main, re-checking
+                       identity so rows the live integration wrote after
+                       staging are still skipped
+      params         — bind parameters for candidates_sql / new_rows_sql
+    """
     source_cols = _column_names(conn, f"{source_alias}.{table}")
     missing = set(required_columns) - source_cols
     if missing:
@@ -314,27 +325,37 @@ def _window_statements(
         f"t.{time_col} BETWEEN strftime('{_ISO_FMT}', l.{time_col}, '-{tol} seconds') "
         f"AND strftime('{_ISO_FMT}', l.{time_col}, '+{tol} seconds')"
     ]
+    # Unary '+' keeps the planner off the per-column indexes (it otherwise
+    # picks e.g. idx_sightings_altitude_closest, whose NULL/0 buckets are
+    # huge) so every probe is a narrow range scan on the time index.
     identity.extend(
-        f"t.{col} IS {_source_expr(col)}"
+        f"+t.{col} IS {_source_expr(col)}"
         for col in columns
         if col != time_col and col not in _NON_IDENTITY_COLUMNS
     )
     not_dup = f"NOT EXISTS (SELECT 1 FROM main.{table} t WHERE {' AND '.join(identity)})"
 
-    from_sql = f"FROM {source_alias}.{table} l WHERE {window_sql}"
     cols_sql = ", ".join(columns)
-    select_sql = ", ".join(_source_expr(col) for col in columns)
-
-    candidates_sql = f"SELECT COUNT(*) {from_sql}"
-    new_rows_sql = f"SELECT {select_sql} {from_sql} AND {not_dup} ORDER BY l.id"
-    # SQLite materializes an INSERT ... SELECT that reads its own target
-    # table before inserting, so rows added by this statement are not
-    # visible to its NOT EXISTS probe — legacy rows that are genuinely
-    # distinct but share every identity column (rare, e.g. two
-    # 'Blocked' flights exiting in the same second) are all kept, exactly
-    # as the legacy DB holds them.
-    insert_sql = f"INSERT INTO main.{table} ({cols_sql}) {new_rows_sql}"
-    return candidates_sql, new_rows_sql, insert_sql, tuple(params)
+    select_sql = ", ".join(f"{_source_expr(col)} AS {col}" for col in columns)
+    from_sql = f"FROM {source_alias}.{table} l WHERE {window_sql}"
+    stage_table = f"_skywatch_import_{table}"
+    return {
+        "candidates_sql": f"SELECT COUNT(*) {from_sql}",
+        "new_rows_sql": f"SELECT {select_sql} {from_sql} AND {not_dup} ORDER BY l.id",
+        "stage_table": stage_table,
+        # SQLite materializes an INSERT ... SELECT that reads its own
+        # target table before inserting, so rows added by this statement
+        # are invisible to its NOT EXISTS probe — legacy rows that are
+        # genuinely distinct but share every identity column (rare, e.g.
+        # two 'Blocked' flights exiting in the same second) are all kept,
+        # exactly as the legacy DB holds them. _source_expr is idempotent,
+        # so re-applying it to the already-normalized stage rows is safe.
+        "commit_sql": (
+            f"INSERT INTO main.{table} ({cols_sql}) "
+            f"SELECT {cols_sql} FROM temp.{stage_table} l WHERE {not_dup} ORDER BY l.rowid"
+        ),
+        "params": tuple(params),
+    }
 
 
 def import_legacy_window(
@@ -354,13 +375,16 @@ def import_legacy_window(
     optional; with neither, the whole legacy DB is considered, which
     makes this a re-run-safe replacement for import_legacy_db().
 
-    Writes happen in one transaction (BEGIN IMMEDIATE), committed before
-    the legacy DB is DETACHed; on error everything is rolled back. With
-    dry_run=True nothing is written and the summary reports what would
-    be inserted.
+    Built to run against a DB the integration is writing to. The
+    expensive part — scanning the legacy window and probing for
+    duplicates — runs as a plain read and stages the new rows in TEMP
+    tables, so it never blocks the integration. Only the final copy runs
+    under the write lock: one BEGIN IMMEDIATE transaction covering both
+    tables, committed before the legacy DB is DETACHed. On error
+    everything is rolled back. With dry_run=True nothing is written.
 
     Returns {"<table>_candidates", "<table>_inserted", "<table>_skipped"}
-    for sightings and airport_movements.
+    for sightings and airport_movements, plus "write_lock_ms".
     """
     if not source_path.exists():
         raise LegacyImportError(f"Source DB not found at {source_path}")
@@ -373,21 +397,13 @@ def import_legacy_window(
         target_conn.commit()
     target_conn.execute("ATTACH DATABASE ? AS legacy", (str(source_path),))
     summary: dict[str, int] = {}
+    plans: list[tuple[str, dict]] = []
     try:
-        existing_tables = {
-            row[0]
-            for row in target_conn.execute(
-                "SELECT name FROM legacy.sqlite_master WHERE type='table'"
-            )
-        }
-        for table, *_ in _WINDOW_TABLES:
-            if table not in existing_tables:
-                raise LegacyImportError(f"Legacy DB has no '{table}' table — refusing to import.")
-
+        _require_tables(target_conn, "legacy", [t for t, *_ in _WINDOW_TABLES])
         plans = [
             (
                 table,
-                _window_statements(
+                _window_plan(
                     target_conn,
                     source_alias="legacy",
                     table=table,
@@ -402,27 +418,56 @@ def import_legacy_window(
             for table, time_col, required, optional in _WINDOW_TABLES
         ]
 
-        if not dry_run:
-            target_conn.execute("BEGIN IMMEDIATE")
-        for table, (candidates_sql, new_rows_sql, insert_sql, params) in plans:
-            candidates = target_conn.execute(candidates_sql, params).fetchone()[0]
+        for table, plan in plans:
+            summary[f"{table}_candidates"] = target_conn.execute(
+                plan["candidates_sql"], plan["params"]
+            ).fetchone()[0]
             if dry_run:
-                inserted = target_conn.execute(
-                    f"SELECT COUNT(*) FROM ({new_rows_sql})", params
+                summary[f"{table}_inserted"] = target_conn.execute(
+                    f"SELECT COUNT(*) FROM ({plan['new_rows_sql']})", plan["params"]
                 ).fetchone()[0]
             else:
-                inserted = target_conn.execute(insert_sql, params).rowcount
-            summary[f"{table}_candidates"] = candidates
-            summary[f"{table}_inserted"] = inserted
-            summary[f"{table}_skipped"] = candidates - inserted
+                target_conn.execute(f"DROP TABLE IF EXISTS temp.{plan['stage_table']}")
+                target_conn.execute(
+                    f"CREATE TEMP TABLE {plan['stage_table']} AS {plan['new_rows_sql']}",
+                    plan["params"],
+                )
+
         if not dry_run:
+            started = time.monotonic()
+            target_conn.execute("BEGIN IMMEDIATE")
+            for table, plan in plans:
+                summary[f"{table}_inserted"] = target_conn.execute(plan["commit_sql"]).rowcount
             target_conn.commit()
+            summary["write_lock_ms"] = int((time.monotonic() - started) * 1000)
+
+        for table, _plan in plans:
+            summary[f"{table}_skipped"] = (
+                summary[f"{table}_candidates"] - summary[f"{table}_inserted"]
+            )
     except BaseException:
         if target_conn.in_transaction:
             target_conn.rollback()
+        _drop_stage_tables(target_conn, plans)
         with contextlib.suppress(sqlite3.OperationalError):
             target_conn.execute("DETACH DATABASE legacy")
         raise
 
+    _drop_stage_tables(target_conn, plans)
     target_conn.execute("DETACH DATABASE legacy")
     return summary
+
+
+def _require_tables(conn: sqlite3.Connection, alias: str, tables: list[str]) -> None:
+    existing = {
+        row[0] for row in conn.execute(f"SELECT name FROM {alias}.sqlite_master WHERE type='table'")
+    }
+    for table in tables:
+        if table not in existing:
+            raise LegacyImportError(f"Legacy DB has no '{table}' table — refusing to import.")
+
+
+def _drop_stage_tables(conn: sqlite3.Connection, plans: list[tuple[str, dict]]) -> None:
+    for _table, plan in plans:
+        with contextlib.suppress(sqlite3.Error):
+            conn.execute(f"DROP TABLE IF EXISTS temp.{plan['stage_table']}")

@@ -90,6 +90,12 @@ def main() -> int:
     conn = sqlite3.connect(args.target, timeout=args.busy_timeout_ms / 1000)
     try:
         conn.execute(f"PRAGMA busy_timeout = {int(args.busy_timeout_ms)}")
+        # A large page cache keeps the index B-trees in memory while the
+        # copy runs under the write lock — the live integration's writers
+        # wait on that lock (Python's default sqlite timeout is 5 s), so
+        # the shorter it's held the better.
+        conn.execute("PRAGMA cache_size = -262144")  # 256 MiB
+        conn.execute("PRAGMA temp_store = MEMORY")
         summary = li.import_legacy_window(
             conn,
             args.source,
