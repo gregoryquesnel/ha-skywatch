@@ -105,7 +105,9 @@ If you previously ran the ha-tinker sky tab's command-line script setup, your hi
 2. Source path: `/config/sky_sightings.db` (default)
 3. Call Service
 
-The import is read-only on the source, transactional on the target, and writes a `.legacy_imported` sentinel next to the new DB on success.
+The import is read-only on the source, transactional on the target, and writes a `.legacy_imported` sentinel next to the new DB on success. Re-running it is safe: a legacy row is skipped when skywatch already has a row for the same event (every payload column equal, timestamps within 2 s). The optional `since` / `until` fields limit the import to a window, which backfills a period skywatch missed while the legacy logger kept recording.
+
+To backfill without loading new integration code (no Core restart), run `scripts/backfill-legacy-window.py` on the HA host with `--module` pointing at a `legacy_import.py` that has `import_legacy_window`. Use `--dry-run` first and `--backup <path>` for an online snapshot before writing.
 
 ### Blueprints
 
