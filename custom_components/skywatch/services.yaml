@@ -1,10 +1,11 @@
 import_legacy_db:
   name: Import legacy sky_sightings.db
   description: >-
-    One-shot migration of a ha-tinker (pre-skywatch) sky_sightings.db
-    into the skywatch DB. Copies sightings + entries + airport_movements
-    rows, applying the v1 schema migration. Fails loudly if either DB
-    is unreachable or if any expected legacy table is missing.
+    Copy sightings and airport_movements from a ha-tinker (pre-skywatch)
+    sky_sightings.db into the skywatch DB. Rows skywatch already holds
+    for the same event are skipped, so it is safe to re-run, and the
+    optional since/until bounds backfill a gap. Fails loudly if either
+    DB is unreachable or if any expected legacy table is missing.
   fields:
     source_path:
       name: Source path
@@ -12,6 +13,20 @@ import_legacy_db:
       required: false
       default: /config/sky_sightings.db
       example: /config/sky_sightings.db
+      selector:
+        text:
+    since:
+      name: Since
+      description: Only rows at or after this time (ISO 8601; no offset = UTC).
+      required: false
+      example: "2026-06-13T12:00:00+00:00"
+      selector:
+        text:
+    until:
+      name: Until
+      description: Only rows before this time (ISO 8601; no offset = UTC).
+      required: false
+      example: "2026-10-10T20:20:00+00:00"
       selector:
         text:
 

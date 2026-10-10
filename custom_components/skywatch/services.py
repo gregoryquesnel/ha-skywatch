@@ -1,8 +1,10 @@
 """Skywatch HA services.
 
 Thin wrapper around the pure-Python legacy_import module. The handler
-opens a sync sqlite3 connection in an executor thread, runs the import
-transactionally, and writes a `.legacy_imported` sentinel on success.
+opens a sync sqlite3 connection in an executor thread, runs the
+de-duplicating windowed import (safe to re-run; optional since/until
+bounds backfill a gap), and writes a `.legacy_imported` sentinel on
+success.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .const import DB_FILENAME, DB_SUBDIR, DOMAIN
-from .legacy_import import LegacyImportError, import_legacy_db
+from .legacy_import import LegacyImportError, import_legacy_window
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -33,6 +35,8 @@ SERVICE_SET_SEARCH_TERM = "set_search_term"
 IMPORT_SERVICE_SCHEMA = vol.Schema(
     {
         vol.Optional("source_path", default="/config/sky_sightings.db"): cv.string,
+        vol.Optional("since"): cv.string,
+        vol.Optional("until"): cv.string,
     }
 )
 
@@ -56,17 +60,19 @@ async def async_register_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError("Skywatch is not configured.")
         target_db_path = Path(hass.config.path(DB_SUBDIR)) / DB_FILENAME
 
+        since = call.data.get("since")
+        until = call.data.get("until")
+
         def _do_import() -> dict:
-            conn = sqlite3.connect(target_db_path)
+            # Own connection, separate from the coordinator's: the import
+            # only holds the write lock for its final copy (see
+            # import_legacy_window), well inside the busy timeout below
+            # and the coordinator's default 5 s.
+            conn = sqlite3.connect(target_db_path, timeout=30)
             try:
-                summary = import_legacy_db(conn, source_path)
-                conn.commit()
-            except BaseException:
-                conn.rollback()
-                raise
+                return import_legacy_window(conn, source_path, since=since, until=until)
             finally:
                 conn.close()
-            return summary
 
         try:
             summary = await hass.async_add_executor_job(_do_import)
