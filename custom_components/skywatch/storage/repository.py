@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from ..const import DEFAULT_ENTRY_TTL_HOURS
@@ -201,3 +202,40 @@ def insert_movement(conn: sqlite3.Connection, movement: Movement) -> int:
         ),
     )
     return int(cursor.lastrowid or 0)
+
+
+# --- Units of work ---------------------------------------------------------
+#
+# One call per source event. Each is a complete transaction ending in a
+# commit, so no transaction outlives it. The coordinator runs them under
+# SerializedConnection.run, i.e. with exclusive use of the connection.
+
+
+def record_positions(
+    conn: sqlite3.Connection, rows: list[tuple[str, datetime, float, float]]
+) -> None:
+    insert_positions(conn, rows)
+    prune_old_positions(conn)
+    conn.commit()
+
+
+def record_entry(conn: sqlite3.Connection, entry: Entry) -> None:
+    insert_entry(conn, entry)
+    prune_stale_entries(conn)
+    conn.commit()
+
+
+def record_exit(conn: sqlite3.Connection, flight_id: str | None, sighting: Sighting) -> int:
+    """Join the entry_time for flight_id (if any), insert the sighting, commit."""
+    entry_time = take_entry_time(conn, flight_id)
+    if entry_time is not None:
+        sighting = replace(sighting, entry_time=entry_time)
+    row_id = insert_sighting(conn, sighting)
+    conn.commit()
+    return row_id
+
+
+def record_movement(conn: sqlite3.Connection, movement: Movement) -> int:
+    row_id = insert_movement(conn, movement)
+    conn.commit()
+    return row_id
