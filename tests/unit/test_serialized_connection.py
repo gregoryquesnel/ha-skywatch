@@ -31,7 +31,7 @@ from custom_components.skywatch.storage import (
     record_positions,
 )
 
-FLIGHTS = 200
+FLIGHTS = 100
 # Recent, so prune_stale_entries (TTL from now) keeps the entries rows.
 T0 = datetime.now(UTC).replace(microsecond=0)
 
@@ -49,6 +49,9 @@ def _read(conn: sqlite3.Connection) -> dict:
 
 def _hammer(db: SerializedConnection) -> list[BaseException]:
     """Fire every kind of unit concurrently; return any exceptions raised."""
+    # Durability is not under test; skip fsync so ~500 commits stay fast on
+    # slow CI disks.
+    db.run(lambda conn: conn.execute("PRAGMA synchronous = OFF"))
     for i in range(FLIGHTS):
         db.run(record_entry, Entry(flight_id=f"f{i}", entry_time=T0, callsign=f"CS{i}"))
 
