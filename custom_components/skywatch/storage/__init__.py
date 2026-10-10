@@ -5,7 +5,7 @@ Public surface — coordinator imports go through here.
 
 from __future__ import annotations
 
-from .connection import open_db
+from .connection import SerializedConnection, open_db
 from .migrations import run_migrations
 from .normalizers import coerce_float, coerce_int, normalize_photo_url, parse_iso
 from .queries import (
@@ -30,12 +30,17 @@ from .repository import (
     insert_sighting,
     prune_old_positions,
     prune_stale_entries,
+    record_entry,
+    record_exit,
+    record_movement,
+    record_positions,
     take_entry_time,
 )
 from .schema import SCHEMA_VERSION
 
 __all__ = [
     "SCHEMA_VERSION",
+    "SerializedConnection",
     "coerce_float",
     "coerce_int",
     "fetch_trails",
@@ -60,6 +65,10 @@ __all__ = [
     "query_today",
     "query_top_routes",
     "query_watch_aircraft",
+    "record_entry",
+    "record_exit",
+    "record_movement",
+    "record_positions",
     "run_migrations",
     "take_entry_time",
 ]

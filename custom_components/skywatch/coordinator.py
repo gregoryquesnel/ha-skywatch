@@ -7,15 +7,17 @@ assemble the platform-facing data dict.
 
 Sync vs async boundary: storage and data_builder are pure-sync; this
 coordinator wraps each sqlite call in `hass.async_add_executor_job` so
-the I/O never blocks the event loop. Source listeners (`_on_entry` etc.)
-are sync, run on the event loop (see backends/base.py), and schedule async
-persistence via `hass.async_create_task`.
+the I/O never blocks the event loop. The executor is a thread pool, so
+every unit of DB work goes through `SerializedConnection.run` (see
+storage/connection.py) — never touch the raw connection directly.
+Source listeners (`_on_entry` etc.) are sync, run on the event loop
+(see backends/base.py), and schedule async persistence via
+`hass.async_create_task`.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -31,19 +33,18 @@ from .classify import is_helicopter, is_military, match_watch
 from .const import DB_FILENAME, DB_SUBDIR, EVENT_SKYWATCH_SIGHTING
 from .data_builder import build_data
 from .storage import (
+    SerializedConnection,
     fetch_trails,
-    insert_entry,
-    insert_movement,
-    insert_positions,
-    insert_sighting,
     open_db,
-    prune_old_positions,
-    prune_stale_entries,
-    take_entry_time,
+    record_entry,
+    record_exit,
+    record_movement,
+    record_positions,
 )
 
 if TYPE_CHECKING:
     import sqlite3
+    from collections.abc import Callable
 
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
@@ -88,7 +89,7 @@ class SkywatchCoordinator(DataUpdateCoordinator):
         self._watch_list = watch_list
         self._overhead_distance_km = overhead_distance_km
         self._overhead_altitude_ft = overhead_altitude_ft
-        self._conn: sqlite3.Connection | None = None
+        self._db: SerializedConnection | None = None
         self._current_page = 1
         self._current_search = ""
         self._unsub_source_listeners: list = []
@@ -115,7 +116,8 @@ class SkywatchCoordinator(DataUpdateCoordinator):
         await self.hass.async_add_executor_job(
             lambda: db_path.parent.mkdir(parents=True, exist_ok=True)
         )
-        self._conn = await self.hass.async_add_executor_job(open_db, db_path)
+        conn = await self.hass.async_add_executor_job(open_db, db_path)
+        self._db = SerializedConnection(conn)
         await self._source.async_setup()
         self._unsub_source_listeners = [
             self._source.on_entry(self._on_entry),
@@ -151,15 +153,25 @@ class SkywatchCoordinator(DataUpdateCoordinator):
             unsub()
         self._unsub_source_listeners = []
         await self._source.async_teardown()
-        if self._conn is not None:
-            await self.hass.async_add_executor_job(self._conn.close)
-            self._conn = None
+        if self._db is not None:
+            db, self._db = self._db, None
+            await self.hass.async_add_executor_job(db.close)
+
+    async def _async_db[R](self, fn: Callable[..., R], *args) -> R | None:
+        """Run fn(conn, *args) in the executor with exclusive use of the DB.
+
+        Returns None (without running fn) once the DB is closed.
+        """
+        db = self._db
+        if db is None:
+            return None
+        return await self.hass.async_add_executor_job(db.run, fn, *args)
 
     async def async_fetch_trails(self, flight_ids: list[str]) -> dict[str, list[list[float]]]:
         """Trail polylines for the given flight ids — used by the GeoJSON view."""
-        if self._conn is None or not flight_ids:
+        if not flight_ids:
             return {}
-        return await self.hass.async_add_executor_job(fetch_trails, self._conn, flight_ids)
+        return await self._async_db(fetch_trails, flight_ids) or {}
 
     async def _capture_positions(self, *_args) -> None:
         """Trail capture — sample positions, persist, prune.
@@ -173,7 +185,7 @@ class SkywatchCoordinator(DataUpdateCoordinator):
         Earlier sync + async_create_task pattern dropped the coroutine
         on the floor in HA 2026 (RuntimeWarning: never awaited).
         """
-        if self._conn is None:
+        if self._db is None:
             return
         flights = self._source.current_flights()
         capture_time = datetime.now(UTC)
@@ -189,13 +201,7 @@ class SkywatchCoordinator(DataUpdateCoordinator):
             except (TypeError, ValueError):
                 continue
         if rows:
-            await self.hass.async_add_executor_job(self._sync_persist_positions, rows)
-
-    def _sync_persist_positions(self, rows: list[tuple[str, datetime, float, float]]) -> None:
-        assert self._conn is not None
-        insert_positions(self._conn, rows)
-        prune_old_positions(self._conn)
-        self._conn.commit()
+            await self._async_db(record_positions, rows)
 
     async def async_set_page(self, page: int) -> None:
         self._current_page = max(1, int(page))
@@ -214,18 +220,15 @@ class SkywatchCoordinator(DataUpdateCoordinator):
         return self._current_search
 
     async def _async_update_data(self) -> dict:
-        if self._conn is None:
-            return {}
-        return await self.hass.async_add_executor_job(self._sync_build_data)
+        return await self._async_db(self._build_data) or {}
 
-    def _sync_build_data(self) -> dict:
-        assert self._conn is not None
+    def _build_data(self, conn: sqlite3.Connection) -> dict:
         # Currently-in-area count is read from the source's live snapshot
         # (FR24's sensor.flightradar24_current_in_area attribute count).
         # It's safe to call from the executor thread — current_flights()
         # is sync and just reads HA state machine.
         return build_data(
-            self._conn,
+            conn,
             tz=self._tz,
             current_page=self._current_page,
             current_search=self._current_search,
@@ -321,37 +324,16 @@ class SkywatchCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_persist_entry(self, entry: Entry) -> None:
-        if self._conn is None:
-            return
-        await self.hass.async_add_executor_job(self._sync_persist_entry, entry)
-
-    def _sync_persist_entry(self, entry: Entry) -> None:
-        assert self._conn is not None
-        insert_entry(self._conn, entry)
-        prune_stale_entries(self._conn)
-        self._conn.commit()
+        await self._async_db(record_entry, entry)
 
     async def _async_persist_exit(self, flight_id: str | None, sighting: Sighting) -> None:
-        if self._conn is None:
+        if self._db is None:
             return
-        await self.hass.async_add_executor_job(self._sync_persist_exit, flight_id, sighting)
+        await self._async_db(record_exit, flight_id, sighting)
         await self.async_request_refresh()
-
-    def _sync_persist_exit(self, flight_id: str | None, sighting: Sighting) -> None:
-        assert self._conn is not None
-        entry_time = take_entry_time(self._conn, flight_id)
-        if entry_time is not None:
-            sighting = replace(sighting, entry_time=entry_time)
-        insert_sighting(self._conn, sighting)
-        self._conn.commit()
 
     async def _async_persist_movement(self, movement: Movement) -> None:
-        if self._conn is None:
+        if self._db is None:
             return
-        await self.hass.async_add_executor_job(self._sync_persist_movement, movement)
+        await self._async_db(record_movement, movement)
         await self.async_request_refresh()
-
-    def _sync_persist_movement(self, movement: Movement) -> None:
-        assert self._conn is not None
-        insert_movement(self._conn, movement)
-        self._conn.commit()
