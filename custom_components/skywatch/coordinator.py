@@ -7,9 +7,9 @@ assemble the platform-facing data dict.
 
 Sync vs async boundary: storage and data_builder are pure-sync; this
 coordinator wraps each sqlite call in `hass.async_add_executor_job` so
-the I/O never blocks the event loop. Source event handlers are sync
-(see backends/base.py) and schedule async persistence via
-`hass.async_create_task`.
+the I/O never blocks the event loop. Source listeners (`_on_entry` etc.)
+are sync, run on the event loop (see backends/base.py), and schedule async
+persistence via `hass.async_create_task`.
 """
 
 from __future__ import annotations

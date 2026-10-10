@@ -95,23 +95,31 @@ class Fr24Source(Source):
         """FR24's `current_in_area` sensor — every state change is a new poll."""
         return [FR24_LIVE_SENSOR]
 
-    def _handle_entry(self, event: Event) -> None:
+    # The four bus handlers MUST run on the event loop. A plain `def`
+    # handler is scheduled by HA into the executor, and the downstream
+    # coordinator listeners call hass.bus.async_fire / async_create_task,
+    # which HA rejects off-loop — so no skywatch_sighting event fired and
+    # nothing was persisted. `async def` (rather than @callback) keeps the
+    # module importable without homeassistant for the unit tests. Nothing
+    # in this path blocks: translation is pure Python, and the coordinator
+    # pushes sqlite writes through hass.async_add_executor_job.
+    async def _handle_entry(self, event: Event) -> None:
         entry = self._payload_to_entry(event.data)
         if entry is not None:
             self._emit_entry(entry)
 
-    def _handle_exit(self, event: Event) -> None:
+    async def _handle_exit(self, event: Event) -> None:
         flight_id = event.data.get("id") if isinstance(event.data, dict) else None
         sighting = self._payload_to_sighting(event.data)
         if sighting is not None:
             self._emit_exit(flight_id, sighting)
 
-    def _handle_landed(self, event: Event) -> None:
+    async def _handle_landed(self, event: Event) -> None:
         movement = self._payload_to_movement(event.data, direction="landed")
         if movement is not None:
             self._emit_landing(movement)
 
-    def _handle_took_off(self, event: Event) -> None:
+    async def _handle_took_off(self, event: Event) -> None:
         movement = self._payload_to_movement(event.data, direction="took_off")
         if movement is not None:
             self._emit_takeoff(movement)

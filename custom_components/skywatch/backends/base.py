@@ -15,6 +15,14 @@ The listener pattern is sync — callbacks fire in the same task that
 processes the provider event. If a callback needs async work (e.g.
 sqlite write via `hass.async_add_executor_job`), it schedules it via
 `hass.async_create_task` and returns immediately.
+
+Because listeners call loop-only HA APIs (`hass.bus.async_fire`,
+`hass.async_create_task`), `_emit_*` must be called from the event loop.
+Backends must therefore register their provider handlers so HA runs them
+on the loop: `async def` handlers or `@callback`-decorated functions.
+A plain `def` handler passed to `hass.bus.async_listen` runs in the
+executor, where HA raises on those calls and the event is lost. Listeners
+must not block (no sqlite or network I/O inline).
 """
 
 from __future__ import annotations
